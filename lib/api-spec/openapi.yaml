@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PostPilot API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User management
+  - name: brands
+    description: Brand management
+  - name: posts
+    description: Post management
+  - name: generate
+    description: AI content generation
+  - name: billing
+    description: Stripe billing
+  - name: dashboard
+    description: Dashboard analytics
+
 paths:
   /healthz:
     get:
@@ -24,7 +37,468 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /brands:
+    get:
+      operationId: listBrands
+      tags: [brands]
+      summary: List all brands for current user
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of brands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Brand"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createBrand
+      tags: [brands]
+      summary: Create a new brand
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBrandBody"
+      responses:
+        "201":
+          description: Created brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Plan limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /brands/{id}:
+    get:
+      operationId: getBrand
+      tags: [brands]
+      summary: Get a specific brand
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Brand details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "404":
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateBrand
+      tags: [brands]
+      summary: Update a brand
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBrandBody"
+      responses:
+        "200":
+          description: Updated brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "404":
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteBrand
+      tags: [brands]
+      summary: Delete a brand
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Brand deleted
+        "404":
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [posts]
+      summary: List all posts for current user
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: brandId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: platform
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: offset
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/{id}:
+    delete:
+      operationId: deletePost
+      tags: [posts]
+      summary: Delete a post
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Post deleted
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generate:
+    post:
+      operationId: generatePost
+      tags: [generate]
+      summary: Generate AI post content
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratePostBody"
+      responses:
+        "200":
+          description: Generated post content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedPost"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generate/save:
+    post:
+      operationId: saveGeneratedPost
+      tags: [generate]
+      summary: Save a generated post to history
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavePostBody"
+      responses:
+        "201":
+          description: Saved post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /billing/plans:
+    get:
+      operationId: listPlans
+      tags: [billing]
+      summary: Get available subscription plans
+      responses:
+        "200":
+          description: List of available plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+
+  /billing/checkout:
+    post:
+      operationId: createCheckoutSession
+      tags: [billing]
+      summary: Create a Stripe checkout session
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckoutBody"
+      responses:
+        "200":
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /billing/portal:
+    post:
+      operationId: createPortalSession
+      tags: [billing]
+      summary: Create a Stripe billing portal session
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalSession"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /billing/webhooks:
+    post:
+      operationId: handleStripeWebhook
+      tags: [billing]
+      summary: Handle Stripe webhook events
+      responses:
+        "200":
+          description: Webhook handled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/recent-posts:
+    get:
+      operationId: getRecentPosts
+      tags: [dashboard]
+      summary: Get recent posts for dashboard
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Recent posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/platform-breakdown:
+    get:
+      operationId: getPlatformBreakdown
+      tags: [dashboard]
+      summary: Get post counts by platform
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Platform breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatformStat"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
+  securitySchemes:
+    clerkAuth:
+      type: http
+      scheme: bearer
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +508,305 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkId:
+          type: string
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        plan:
+          type: string
+          enum: [free, starter, pro, agency]
+        stripeCustomerId:
+          type: ["string", "null"]
+        stripeSubscriptionId:
+          type: ["string", "null"]
+        subscriptionStatus:
+          type: ["string", "null"]
+        trialEndsAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - clerkId
+        - email
+        - plan
+        - createdAt
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+
+    Brand:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        industry:
+          type: string
+        tone:
+          type: string
+          enum: [friendly, professional, fun, inspirational]
+        targetAudience:
+          type: string
+        keywords:
+          type: string
+        platforms:
+          type: array
+          items:
+            type: string
+        postTime:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - name
+        - industry
+        - tone
+        - targetAudience
+        - keywords
+        - platforms
+        - postTime
+        - active
+        - createdAt
+
+    CreateBrandBody:
+      type: object
+      properties:
+        name:
+          type: string
+        industry:
+          type: string
+        tone:
+          type: string
+          enum: [friendly, professional, fun, inspirational]
+        targetAudience:
+          type: string
+        keywords:
+          type: string
+        platforms:
+          type: array
+          items:
+            type: string
+        postTime:
+          type: string
+      required:
+        - name
+        - industry
+        - tone
+        - targetAudience
+        - keywords
+        - platforms
+
+    UpdateBrandBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        tone:
+          type: ["string", "null"]
+        targetAudience:
+          type: ["string", "null"]
+        keywords:
+          type: ["string", "null"]
+        platforms:
+          type: ["array", "null"]
+          items:
+            type: string
+        postTime:
+          type: ["string", "null"]
+        active:
+          type: ["boolean", "null"]
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        brandId:
+          type: integer
+        brandName:
+          type: ["string", "null"]
+        platform:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [generated, published, failed, scheduled]
+        publishedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - brandId
+        - platform
+        - content
+        - status
+        - createdAt
+
+    GeneratePostBody:
+      type: object
+      properties:
+        brandId:
+          type: integer
+        platform:
+          type: string
+          enum: [facebook, instagram, linkedin, tiktok]
+        topic:
+          type: ["string", "null"]
+      required:
+        - brandId
+        - platform
+
+    GeneratedPost:
+      type: object
+      properties:
+        content:
+          type: string
+        platform:
+          type: string
+        brandId:
+          type: integer
+      required:
+        - content
+        - platform
+        - brandId
+
+    SavePostBody:
+      type: object
+      properties:
+        brandId:
+          type: integer
+        platform:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [generated, published, failed, scheduled]
+      required:
+        - brandId
+        - platform
+        - content
+        - status
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: integer
+        stripePriceId:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        brandLimit:
+          type: ["integer", "null"]
+      required:
+        - id
+        - name
+        - price
+        - features
+
+    CreateCheckoutBody:
+      type: object
+      properties:
+        planId:
+          type: string
+        successUrl:
+          type: string
+        cancelUrl:
+          type: string
+      required:
+        - planId
+        - successUrl
+        - cancelUrl
+
+    CheckoutSession:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    PortalSession:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    DashboardStats:
+      type: object
+      properties:
+        totalBrands:
+          type: integer
+        totalPosts:
+          type: integer
+        publishedPosts:
+          type: integer
+        generatedPosts:
+          type: integer
+        failedPosts:
+          type: integer
+        platformsConnected:
+          type: integer
+        postsThisWeek:
+          type: integer
+        postsThisMonth:
+          type: integer
+      required:
+        - totalBrands
+        - totalPosts
+        - publishedPosts
+        - generatedPosts
+        - failedPosts
+        - platformsConnected
+        - postsThisWeek
+        - postsThisMonth
+
+    PlatformStat:
+      type: object
+      properties:
+        platform:
+          type: string
+        count:
+          type: integer
+      required:
+        - platform
+        - count

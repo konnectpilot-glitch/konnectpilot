@@ -1,0 +1,71 @@
+import { Router, type IRouter } from "express";
+import { getAuth } from "@clerk/express";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
+import {
+  GetMeResponse,
+  UpdateMeBody,
+  UpdateMeResponse,
+} from "@workspace/api-zod";
+import { logger } from "../lib/logger";
+
+const router: IRouter = Router();
+
+// Ensure user exists in DB (upsert on first request)
+async function ensureUser(clerkId: string, email: string) {
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  if (existing) return existing;
+  const [created] = await db
+    .insert(usersTable)
+    .values({ clerkId, email, plan: "free" })
+    .returning();
+  return created;
+}
+
+export async function requireAuth(req: any, res: any, next: any): Promise<void> {
+  const auth = getAuth(req);
+  const userId = auth?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  req.clerkUserId = userId;
+  req.clerkEmail = auth.sessionClaims?.email as string || "";
+  next();
+}
+
+router.get("/users/me", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  res.json(GetMeResponse.parse({
+    ...user,
+    trialEndsAt: user.trialEndsAt?.toISOString() ?? null,
+    createdAt: user.createdAt.toISOString(),
+  }));
+});
+
+router.patch("/users/me", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const parsed = UpdateMeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const updates: Partial<typeof usersTable.$inferInsert> = {};
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+
+  const [updated] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, user.id))
+    .returning();
+
+  res.json(UpdateMeResponse.parse({
+    ...updated,
+    trialEndsAt: updated.trialEndsAt?.toISOString() ?? null,
+    createdAt: updated.createdAt.toISOString(),
+  }));
+});
+
+export { ensureUser };
+export default router;
