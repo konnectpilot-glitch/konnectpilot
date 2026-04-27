@@ -198,12 +198,19 @@ export default function GeneratePage() {
 
   async function handleDownloadImage() {
     if (!generatedImageUrl) return;
-    const a = document.createElement("a");
-    a.href = generatedImageUrl;
-    a.download = `post-image-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const blob = await fetch(generatedImageUrl).then(r => r.blob());
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `post-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(generatedImageUrl, "_blank");
+    }
   }
 
   const isVideoCompatible = selectedPlatform === "tiktok" || selectedPlatform === "instagram";

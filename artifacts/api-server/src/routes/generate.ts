@@ -108,43 +108,21 @@ The image should feel polished, brand-appropriate, and scroll-stopping.
 No text overlays. Clean composition with strong visual hierarchy.`;
   }
 
-  const googleApiKey = process.env.GOOGLE_API_KEY_NANO_BANNA;
-  if (!googleApiKey) {
-    res.status(500).json({ error: "Google image generation API key not configured" });
+  const imageResponse = await openai.images.generate({
+    model: "dall-e-3",
+    prompt: imagePrompt,
+    n: 1,
+    size: "1024x1024",
+    quality: "standard",
+  });
+
+  const imageUrl = imageResponse.data[0]?.url ?? null;
+
+  if (!imageUrl) {
+    res.status(500).json({ error: "Image generation failed — no image returned" });
     return;
   }
 
-  const googleRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${googleApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt: imagePrompt }],
-        parameters: { sampleCount: 1 },
-      }),
-    }
-  );
-
-  if (!googleRes.ok) {
-    const errBody = await googleRes.text();
-    logger.error({ status: googleRes.status, body: errBody }, "Google Imagen API error");
-    res.status(500).json({ error: `Image generation failed: ${googleRes.status}` });
-    return;
-  }
-
-  const googleData = await googleRes.json() as any;
-  const prediction = googleData?.predictions?.[0];
-  const base64 = prediction?.bytesBase64Encoded ?? null;
-  const mimeType = prediction?.mimeType ?? "image/png";
-
-  if (!base64) {
-    logger.error({ googleData }, "No image in Google Imagen response");
-    res.status(500).json({ error: "No image returned from Google Imagen" });
-    return;
-  }
-
-  const imageUrl = `data:${mimeType};base64,${base64}`;
   res.json({ imageUrl, prompt: imagePrompt });
 });
 
