@@ -7,7 +7,7 @@ const features = [
   {
     icon: Bot,
     title: "AI-Written Content",
-    description: "Claude AI writes platform-specific posts tailored to your brand voice, industry, and audience.",
+    description: "OpenAI GPT-4 writes platform-specific posts tailored to your brand voice, industry, and audience.",
   },
   {
     icon: Clock,
@@ -57,7 +57,7 @@ export default function LandingPage() {
           <span className="text-primary block">without lifting a finger</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          PostPilot uses Claude AI to write and publish platform-specific social media content for your brands every single day — automatically.
+          PostPilot uses OpenAI GPT-4 to write, illustrate, and publish platform-specific social media content for your brands every single day — automatically.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
           <Link href="/sign-up" className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors">

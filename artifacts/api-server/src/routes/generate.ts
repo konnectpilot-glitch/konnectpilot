@@ -73,6 +73,119 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
   }));
 });
 
+router.post("/generate/image", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const { brandId, postContent, platform, topic } = req.body;
+
+  if (!brandId || !postContent) {
+    res.status(400).json({ error: "brandId and postContent are required" });
+    return;
+  }
+
+  const [brand] = await db
+    .select()
+    .from(brandsTable)
+    .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
+
+  if (!brand) {
+    res.status(404).json({ error: "Brand not found" });
+    return;
+  }
+
+  const imagePrompt = `Create a visually striking, professional social media image for ${brand.name}, a ${brand.industry} brand.
+Style: ${brand.tone} tone, appealing to ${brand.targetAudience}.
+${topic ? `Theme: ${topic}.` : ""}
+Platform: ${platform || "social media"}.
+The image should feel polished, brand-appropriate, and scroll-stopping.
+No text overlays. Clean composition with strong visual hierarchy.`;
+
+  const response = await openai.images.generate({
+    model: "dall-e-3",
+    prompt: imagePrompt,
+    n: 1,
+    size: "1024x1024",
+    quality: "standard",
+  });
+
+  const imageUrl = response.data[0]?.url ?? null;
+
+  if (!imageUrl) {
+    res.status(500).json({ error: "Image generation failed" });
+    return;
+  }
+
+  res.json({ imageUrl });
+});
+
+router.post("/generate/video-script", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const { brandId, topic, platform } = req.body;
+
+  if (!brandId) {
+    res.status(400).json({ error: "brandId is required" });
+    return;
+  }
+
+  const [brand] = await db
+    .select()
+    .from(brandsTable)
+    .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
+
+  if (!brand) {
+    res.status(404).json({ error: "Brand not found" });
+    return;
+  }
+
+  const targetPlatform = platform || "tiktok";
+  const topicLine = topic ? `Topic: ${topic}` : "Choose an engaging topic based on the brand's industry and keywords.";
+
+  const scriptPrompt = `You are a professional short-form video scriptwriter for ${brand.name}, a ${brand.industry} brand targeting ${brand.targetAudience}.
+Tone: ${brand.tone}. Keywords to weave in: ${brand.keywords}.
+${topicLine}
+Platform: ${targetPlatform === "tiktok" ? "TikTok (15–60 seconds)" : "Instagram Reels (15–30 seconds)"}
+
+Write a complete short-form video script in JSON format with this exact structure:
+{
+  "title": "Video title",
+  "duration": "estimated duration e.g. 30 seconds",
+  "hook": "First 3 seconds — the attention-grabbing opening line spoken on camera",
+  "scenes": [
+    {
+      "scene": 1,
+      "visual": "What the camera shows / B-roll description",
+      "voiceover": "What is said or shown as text overlay",
+      "duration": "e.g. 5 seconds"
+    }
+  ],
+  "callToAction": "The final CTA line",
+  "caption": "The post caption with hashtags"
+}
+
+Return ONLY valid JSON. No markdown, no explanation.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    max_completion_tokens: 2048,
+    messages: [{ role: "user", content: scriptPrompt }],
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+
+  let script: any;
+  try {
+    script = JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    try {
+      script = match ? JSON.parse(match[0]) : {};
+    } catch {
+      script = { error: "Could not parse script", raw };
+    }
+  }
+
+  res.json({ script });
+});
+
 router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);
   const parsed = SaveGeneratedPostBody.safeParse(req.body);
