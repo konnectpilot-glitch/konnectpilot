@@ -75,29 +75,38 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
 
 router.post("/generate/image", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);
-  const { brandId, postContent, platform, topic } = req.body;
+  const { brandId, customPrompt, platform, topic } = req.body;
 
-  if (!brandId || !postContent) {
-    res.status(400).json({ error: "brandId and postContent are required" });
+  // Allow pure custom prompt with no brand required
+  if (!customPrompt && !brandId) {
+    res.status(400).json({ error: "Provide either a custom prompt or a brand" });
     return;
   }
 
-  const [brand] = await db
-    .select()
-    .from(brandsTable)
-    .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
+  let imagePrompt: string;
 
-  if (!brand) {
-    res.status(404).json({ error: "Brand not found" });
-    return;
-  }
+  if (customPrompt && customPrompt.trim()) {
+    // User typed their own description — use it directly
+    imagePrompt = customPrompt.trim();
+  } else {
+    // Build prompt from brand details
+    const [brand] = await db
+      .select()
+      .from(brandsTable)
+      .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
 
-  const imagePrompt = `Create a visually striking, professional social media image for ${brand.name}, a ${brand.industry} brand.
+    if (!brand) {
+      res.status(404).json({ error: "Brand not found" });
+      return;
+    }
+
+    imagePrompt = `Create a visually striking, professional social media image for ${brand.name}, a ${brand.industry} brand.
 Style: ${brand.tone} tone, appealing to ${brand.targetAudience}.
 ${topic ? `Theme: ${topic}.` : ""}
 Platform: ${platform || "social media"}.
 The image should feel polished, brand-appropriate, and scroll-stopping.
 No text overlays. Clean composition with strong visual hierarchy.`;
+  }
 
   const response = await openai.images.generate({
     model: "dall-e-3",
@@ -114,7 +123,7 @@ No text overlays. Clean composition with strong visual hierarchy.`;
     return;
   }
 
-  res.json({ imageUrl });
+  res.json({ imageUrl, prompt: imagePrompt });
 });
 
 router.post("/generate/video-script", requireAuth, async (req: any, res): Promise<void> => {
