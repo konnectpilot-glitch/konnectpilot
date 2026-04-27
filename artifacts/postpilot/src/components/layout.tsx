@@ -11,6 +11,9 @@ import {
   Menu,
   X,
   Zap,
+  Image,
+  Clapperboard,
+  ChevronDown,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -19,7 +22,15 @@ import { useClerk } from "@clerk/react";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/brands", label: "Brands", icon: Building2 },
-  { href: "/generate", label: "Generate Post", icon: Sparkles },
+  {
+    href: "/generate",
+    label: "Generate Post",
+    icon: Sparkles,
+    children: [
+      { href: "/generate?tab=image", label: "Post Image", icon: Image },
+      { href: "/generate?tab=video", label: "Video Script", icon: Clapperboard },
+    ],
+  },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -45,6 +56,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { signOut } = useClerk();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Check if we're on the generate page — keep sub-items visible
+  const onGeneratePage = location === "/generate" || location.startsWith("/generate");
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="px-4 py-5 border-b border-border">
@@ -56,24 +70,58 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = location === href || location.startsWith(href + "/");
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {navItems.map(({ href, label, icon: Icon, children: subItems }) => {
+          const isActive = location === href || (location.startsWith(href + "?") || location.startsWith(href + "/"));
+          const hasChildren = subItems && subItems.length > 0;
+
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            <div key={href}>
+              <Link
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1">{label}</span>
+                {hasChildren && (
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", onGeneratePage && "rotate-180")} />
+                )}
+              </Link>
+
+              {/* Sub-items — shown when parent page is active */}
+              {hasChildren && onGeneratePage && (
+                <div className="ml-3 pl-4 border-l border-border mt-0.5 mb-1 space-y-0.5">
+                  {subItems.map(({ href: subHref, label: subLabel, icon: SubIcon }) => {
+                    // Determine if this sub-item tab is active via search param
+                    const tabParam = subHref.split("?tab=")[1];
+                    const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+                    const subActive = currentSearch.includes(`tab=${tabParam}`);
+                    return (
+                      <Link
+                        key={subHref}
+                        href={subHref}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                          subActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        )}
+                      >
+                        <SubIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                        {subLabel}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-            </Link>
+            </div>
           );
         })}
       </nav>

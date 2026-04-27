@@ -1,5 +1,6 @@
 import Layout from "@/components/layout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import {
   useListBrands,
@@ -67,7 +68,15 @@ export default function GeneratePage() {
   const savePost = useSaveGeneratedPost();
   const queryClient = useQueryClient();
 
-  const [mode, setMode] = useState<Mode>("text");
+  // Reactively switch tab when URL changes (e.g. sidebar click)
+  const search = useSearch();
+  const tabFromUrl = (() => {
+    const tab = new URLSearchParams(search).get("tab");
+    if (tab === "image" || tab === "video") return tab as Mode;
+    return "text" as Mode;
+  })();
+  const [mode, setMode] = useState<Mode>(tabFromUrl);
+  useEffect(() => { setMode(tabFromUrl); }, [tabFromUrl]);
 
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [generatedPlatform, setGeneratedPlatform] = useState<string | null>(null);
