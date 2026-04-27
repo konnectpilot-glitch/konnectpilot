@@ -115,40 +115,35 @@ No text overlays. Clean composition with strong visual hierarchy.`;
   }
 
   const googleRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${googleApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${googleApiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: imagePrompt }] }],
-        generationConfig: {
-          responseModalities: ["IMAGE", "TEXT"],
-        },
+        instances: [{ prompt: imagePrompt }],
+        parameters: { sampleCount: 1 },
       }),
     }
   );
 
   if (!googleRes.ok) {
     const errBody = await googleRes.text();
-    logger.error({ status: googleRes.status, body: errBody }, "Google Gemini image API error");
+    logger.error({ status: googleRes.status, body: errBody }, "Google Imagen API error");
     res.status(500).json({ error: `Image generation failed: ${googleRes.status}` });
     return;
   }
 
   const googleData = await googleRes.json() as any;
+  const prediction = googleData?.predictions?.[0];
+  const base64 = prediction?.bytesBase64Encoded ?? null;
+  const mimeType = prediction?.mimeType ?? "image/png";
 
-  // Find the image part in the response
-  const parts: any[] = googleData?.candidates?.[0]?.content?.parts ?? [];
-  const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
-
-  if (!imagePart) {
-    logger.error({ googleData }, "No image part in Google response");
-    res.status(500).json({ error: "No image returned from Google" });
+  if (!base64) {
+    logger.error({ googleData }, "No image in Google Imagen response");
+    res.status(500).json({ error: "No image returned from Google Imagen" });
     return;
   }
 
-  const base64 = imagePart.inlineData.data;
-  const mimeType = imagePart.inlineData.mimeType ?? "image/png";
   const imageUrl = `data:${mimeType};base64,${base64}`;
   res.json({ imageUrl, prompt: imagePrompt });
 });
