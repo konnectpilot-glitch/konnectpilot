@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, ensureUser } from "./users";
 import { logger } from "../lib/logger";
-import Anthropic from "@anthropic-ai/sdk";
+import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
 
@@ -56,22 +56,15 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
     return;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: "AI service not configured" });
-    return;
-  }
-
-  const client = new Anthropic({ apiKey });
   const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic);
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 1024,
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    max_completion_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const content = message.content[0].type === "text" ? message.content[0].text : "";
+  const content = completion.choices[0]?.message?.content ?? "";
 
   res.json(GeneratePostResponse.parse({
     content,
@@ -88,7 +81,6 @@ router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> 
     return;
   }
 
-  // Verify brand belongs to user
   const [brand] = await db
     .select()
     .from(brandsTable)
