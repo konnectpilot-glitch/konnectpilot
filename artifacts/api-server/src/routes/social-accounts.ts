@@ -28,21 +28,21 @@ const OAUTH_CONFIG: Record<string, { envKey: string; authUrl: (redirectUri: stri
   },
 };
 
-router.get("/social-accounts/connect/:platform", requireAuth, async (req: any, res): Promise<void> => {
-  const platform = req.params.platform as string;
-  const config = OAUTH_CONFIG[platform];
+router.post("/social-accounts/connect", requireAuth, async (req: any, res): Promise<void> => {
+  const { platform } = req.body ?? {};
+  const config = OAUTH_CONFIG[platform as string];
   if (!config) {
     res.status(400).json({ error: "Unsupported platform" });
     return;
   }
   if (!process.env[config.envKey]) {
-    res.redirect(`/accounts?error=not_configured&platform=${platform}`);
+    res.status(503).json({ error: "not_configured" });
     return;
   }
   const state = Buffer.from(JSON.stringify({ platform, userId: req.clerkUserId })).toString("base64url");
   const appUrl = process.env.APP_URL ?? `https://${req.headers.host}`;
   const redirectUri = `${appUrl}/api/social-accounts/callback/${platform}`;
-  res.redirect(config.authUrl(redirectUri, state));
+  res.json({ url: config.authUrl(redirectUri, state) });
 });
 
 router.get("/social-accounts/callback/:platform", async (_req, res): Promise<void> => {

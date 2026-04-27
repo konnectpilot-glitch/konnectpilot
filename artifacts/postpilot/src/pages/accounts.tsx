@@ -2,6 +2,7 @@ import Layout from "@/components/layout";
 import { useState, useEffect } from "react";
 import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -145,8 +146,43 @@ function useDisconnectAccount() {
 export default function AccountsPage() {
   const { data: connected = [], isLoading } = useListSocialAccounts();
   const disconnect = useDisconnectAccount();
+  const { getToken } = useAuth();
   const [connectDialog, setConnectDialog] = useState<typeof PLATFORMS[0] | null>(null);
   const [disconnectId, setDisconnectId] = useState<number | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const handleAuthorise = async (platform: typeof PLATFORMS[0]) => {
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/social-accounts/connect`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ platform: platform.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "not_configured") {
+          setConnectError(`${platform.label} OAuth credentials are not yet configured on this server. Please contact your administrator to enable this integration.`);
+        } else {
+          setConnectError(data.error ?? "Something went wrong. Please try again.");
+        }
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      setConnectError("Network error. Please check your connection and try again.");
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const search = useSearch();
   useEffect(() => {
@@ -279,7 +315,7 @@ export default function AccountsPage() {
       </div>
 
       {/* Connect dialog */}
-      <Dialog open={!!connectDialog} onOpenChange={() => setConnectDialog(null)}>
+      <Dialog open={!!connectDialog} onOpenChange={() => { setConnectDialog(null); setConnectError(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -293,27 +329,36 @@ export default function AccountsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-1">
-            <p className="text-sm text-muted-foreground">
-              Clicking <strong>Authorise</strong> will open {connectDialog?.label}'s login page.
-              Sign in with the account you want to publish from, then grant the requested permissions.
-            </p>
+            {connectError ? (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
+                <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{connectError}</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Clicking <strong>Authorise</strong> will open {connectDialog?.label}'s login page.
+                Sign in with the account you want to publish from, then grant the requested permissions.
+              </p>
+            )}
             <div className="rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
               <strong>Permissions requested:</strong> {connectDialog?.scopeHint}
             </div>
             <div className="flex flex-col gap-2">
               <Button
                 className="w-full"
+                disabled={connecting}
                 onClick={() => {
-                  if (connectDialog) {
-                    window.location.href = connectDialog.connectUrl;
-                  }
+                  if (connectDialog) handleAuthorise(connectDialog);
                 }}
               >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Authorise with {connectDialog?.label}
+                {connecting ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Connecting…</>
+                ) : (
+                  <><ExternalLink className="w-4 h-4 mr-2" />Authorise with {connectDialog?.label}</>
+                )}
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => setConnectDialog(null)}>
-                Cancel
+              <Button variant="outline" className="w-full" disabled={connecting} onClick={() => { setConnectDialog(null); setConnectError(null); }}>
+                {connectError ? "Close" : "Cancel"}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
