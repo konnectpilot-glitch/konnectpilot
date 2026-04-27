@@ -14,6 +14,7 @@ import {
   Image,
   Clapperboard,
   ChevronDown,
+  Share2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const navItems = [
     ],
   },
   { href: "/posts", label: "Post History", icon: FileText },
+  { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

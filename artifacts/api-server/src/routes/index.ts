@@ -6,6 +6,7 @@ import postsRouter from "./posts";
 import generateRouter from "./generate";
 import billingRouter from "./billing";
 import dashboardRouter from "./dashboard";
+import socialAccountsRouter from "./social-accounts";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(postsRouter);
 router.use(generateRouter);
 router.use(billingRouter);
 router.use(dashboardRouter);
+router.use(socialAccountsRouter);
 
 export default router;
