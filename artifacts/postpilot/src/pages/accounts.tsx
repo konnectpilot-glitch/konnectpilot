@@ -1,5 +1,6 @@
 import Layout from "@/components/layout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,21 @@ export default function AccountsPage() {
   const disconnect = useDisconnectAccount();
   const [connectDialog, setConnectDialog] = useState<typeof PLATFORMS[0] | null>(null);
   const [disconnectId, setDisconnectId] = useState<number | null>(null);
+
+  const search = useSearch();
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("connected") === "1") {
+      toast.success("Account connected successfully!");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    const errorPlatform = params.get("platform");
+    if (params.get("error") === "not_configured" && errorPlatform) {
+      const label = PLATFORMS.find(p => p.id === errorPlatform)?.label ?? errorPlatform;
+      toast.error(`${label} integration needs OAuth credentials. Contact your admin to configure it.`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [search]);
 
   const getConnected = (platformId: string) =>
     connected.filter(a => a.platform === platformId);
