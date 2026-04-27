@@ -201,8 +201,9 @@ export default function GeneratePage() {
     const a = document.createElement("a");
     a.href = generatedImageUrl;
     a.download = `post-image-${Date.now()}.png`;
-    a.target = "_blank";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   const isVideoCompatible = selectedPlatform === "tiktok" || selectedPlatform === "instagram";
