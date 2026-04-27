@@ -423,7 +423,7 @@ export default function GeneratePage() {
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-4 gap-3">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">AI is creating your image...</p>
-                    <p className="text-xs text-muted-foreground">This may take 15–20 seconds</p>
+                    <p className="text-xs text-muted-foreground">This may take 10–20 seconds</p>
                   </div>
                 ) : !generatedImageUrl ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-4">

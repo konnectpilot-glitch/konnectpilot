@@ -108,18 +108,15 @@ The image should feel polished, brand-appropriate, and scroll-stopping.
 No text overlays. Clean composition with strong visual hierarchy.`;
   }
 
-  const imageResponse = await openai.images.generate({
-    model: "dall-e-3",
-    prompt: imagePrompt,
-    n: 1,
-    size: "1024x1024",
-    quality: "standard",
-  });
+  // Use Pollinations.ai — free image generation, no API key required
+  const encodedPrompt = encodeURIComponent(imagePrompt);
+  const seed = Math.floor(Math.random() * 999999);
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
 
-  const imageUrl = imageResponse.data[0]?.url ?? null;
-
-  if (!imageUrl) {
-    res.status(500).json({ error: "Image generation failed — no image returned" });
+  // Verify the image is actually reachable before returning
+  const check = await fetch(imageUrl, { method: "HEAD" });
+  if (!check.ok) {
+    res.status(500).json({ error: "Image generation failed — could not reach generation service" });
     return;
   }
 
