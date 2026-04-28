@@ -49,6 +49,46 @@ router.get("/social-accounts/callback/:platform", async (_req, res): Promise<voi
   res.redirect("/accounts?connected=1");
 });
 
+router.post("/social-accounts/manual-connect", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const { platform, accountName, accountHandle } = req.body ?? {};
+
+  if (!platform || typeof platform !== "string" || !OAUTH_CONFIG[platform]) {
+    res.status(400).json({ error: "Unsupported platform" });
+    return;
+  }
+  if (!accountName || typeof accountName !== "string" || !accountName.trim()) {
+    res.status(400).json({ error: "Account name is required" });
+    return;
+  }
+
+  const trimmedName = accountName.trim();
+  const trimmedHandle = typeof accountHandle === "string" ? accountHandle.trim() : "";
+
+  const [account] = await db
+    .insert(socialAccountsTable)
+    .values({
+      userId: user.id,
+      platform,
+      platformUserId: `manual-${platform}-${Date.now()}`,
+      accountName: trimmedName,
+      accountHandle: trimmedHandle || null,
+      accessToken: "manual:no-token",
+      isActive: true,
+    })
+    .returning();
+
+  res.status(201).json({
+    id: account.id,
+    platform: account.platform,
+    accountName: account.accountName,
+    accountHandle: account.accountHandle,
+    profilePictureUrl: account.profilePictureUrl,
+    isActive: account.isActive,
+    createdAt: account.createdAt.toISOString(),
+  });
+});
+
 router.get("/social-accounts", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);
   const accounts = await db

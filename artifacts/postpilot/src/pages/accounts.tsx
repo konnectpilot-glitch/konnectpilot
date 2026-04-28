@@ -151,6 +151,26 @@ export default function AccountsPage() {
   const [disconnectId, setDisconnectId] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [dialogMode, setDialogMode] = useState<"oauth" | "manual">("oauth");
+  const [manualName, setManualName] = useState("");
+  const [manualHandle, setManualHandle] = useState("");
+  const queryClient = useQueryClient();
+
+  const closeDialog = () => {
+    setConnectDialog(null);
+    setConnectError(null);
+    setDialogMode("oauth");
+    setManualName("");
+    setManualHandle("");
+  };
+
+  const openConnectDialog = (platform: typeof PLATFORMS[0]) => {
+    setConnectDialog(platform);
+    setConnectError(null);
+    setDialogMode("oauth");
+    setManualName("");
+    setManualHandle("");
+  };
 
   const handleAuthorise = async (platform: typeof PLATFORMS[0]) => {
     setConnecting(true);
@@ -168,7 +188,7 @@ export default function AccountsPage() {
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "not_configured") {
-          setConnectError(`${platform.label} OAuth credentials are not yet configured on this server. Please contact your administrator to enable this integration.`);
+          setConnectError(`${platform.label} OAuth login isn't set up yet (it requires platform approval that can take days). Use "Connect manually" below to add your account now and start using PostPilot right away.`);
         } else {
           setConnectError(data.error ?? "Something went wrong. Please try again.");
         }
@@ -177,6 +197,42 @@ export default function AccountsPage() {
       if (data.url) {
         window.location.href = data.url;
       }
+    } catch {
+      setConnectError("Network error. Please check your connection and try again.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleManualConnect = async (platform: typeof PLATFORMS[0]) => {
+    if (!manualName.trim()) {
+      setConnectError("Please enter the account name.");
+      return;
+    }
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/social-accounts/manual-connect`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          platform: platform.id,
+          accountName: manualName.trim(),
+          accountHandle: manualHandle.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConnectError(data.error ?? "Failed to add account. Please try again.");
+        return;
+      }
+      toast.success(`${platform.label} account added!`);
+      queryClient.invalidateQueries({ queryKey: ["social-accounts"] });
+      closeDialog();
     } catch {
       setConnectError("Network error. Please check your connection and try again.");
     } finally {
@@ -284,7 +340,7 @@ export default function AccountsPage() {
                     variant={isConnected ? "outline" : "default"}
                     size="sm"
                     className="w-full"
-                    onClick={() => setConnectDialog(platform)}
+                    onClick={() => openConnectDialog(platform)}
                   >
                     {isConnected ? "Connect another account" : `Connect ${platform.label}`}
                   </Button>
@@ -315,64 +371,140 @@ export default function AccountsPage() {
       </div>
 
       {/* Connect dialog */}
-      <Dialog open={!!connectDialog} onOpenChange={() => { setConnectDialog(null); setConnectError(null); }}>
+      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {connectDialog?.icon && (
                 <span className="w-6 h-6">{connectDialog.icon}</span>
               )}
-              Connect {connectDialog?.label}
+              {dialogMode === "manual" ? `Add ${connectDialog?.label} account` : `Connect ${connectDialog?.label}`}
             </DialogTitle>
             <DialogDescription>
-              Authorise PostPilot to publish on your behalf.
+              {dialogMode === "manual"
+                ? "Add your account details below. You can update these any time."
+                : "Authorise PostPilot to publish on your behalf."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-1">
-            {connectError ? (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
-                <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{connectError}</span>
+
+          {dialogMode === "oauth" ? (
+            <div className="space-y-4 pt-1">
+              {connectError ? (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
+                  <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{connectError}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Clicking <strong>Authorise</strong> will open {connectDialog?.label}'s login page.
+                  Sign in with the account you want to publish from, then grant the requested permissions.
+                </p>
+              )}
+              <div className="rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
+                <strong>Permissions requested:</strong> {connectDialog?.scopeHint}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Clicking <strong>Authorise</strong> will open {connectDialog?.label}'s login page.
-                Sign in with the account you want to publish from, then grant the requested permissions.
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full"
+                  disabled={connecting}
+                  onClick={() => {
+                    if (connectDialog) handleAuthorise(connectDialog);
+                  }}
+                >
+                  {connecting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Connecting…</>
+                  ) : (
+                    <><ExternalLink className="w-4 h-4 mr-2" />Authorise with {connectDialog?.label}</>
+                  )}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  disabled={connecting}
+                  onClick={() => { setDialogMode("manual"); setConnectError(null); }}
+                >
+                  Connect manually instead
+                </Button>
+                <Button variant="outline" className="w-full" disabled={connecting} onClick={closeDialog}>
+                  {connectError ? "Close" : "Cancel"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Need help?{" "}
+                <a
+                  href={connectDialog?.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline"
+                >
+                  {connectDialog?.label} developer docs
+                </a>
               </p>
-            )}
-            <div className="rounded-lg bg-secondary/60 border border-border p-3 text-xs text-muted-foreground">
-              <strong>Permissions requested:</strong> {connectDialog?.scopeHint}
             </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                className="w-full"
-                disabled={connecting}
-                onClick={() => {
-                  if (connectDialog) handleAuthorise(connectDialog);
-                }}
-              >
-                {connecting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Connecting…</>
-                ) : (
-                  <><ExternalLink className="w-4 h-4 mr-2" />Authorise with {connectDialog?.label}</>
-                )}
-              </Button>
-              <Button variant="outline" className="w-full" disabled={connecting} onClick={() => { setConnectDialog(null); setConnectError(null); }}>
-                {connectError ? "Close" : "Cancel"}
-              </Button>
+          ) : (
+            <div className="space-y-4 pt-1">
+              {connectError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
+                  <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{connectError}</span>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Account name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder={`e.g. ${connectDialog?.label === "Facebook" ? "ClicknKonnect Page" : "ClicknKonnect"}`}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  disabled={connecting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Handle / Username <span className="text-muted-foreground text-xs">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualHandle}
+                  onChange={(e) => setManualHandle(e.target.value)}
+                  placeholder="@yourhandle"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  disabled={connecting}
+                />
+              </div>
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2 text-xs text-amber-800">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Manual mode lets you organise your accounts in PostPilot now.
+                  To enable automatic posting, the {connectDialog?.label} OAuth integration will need to be set up later.
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full"
+                  disabled={connecting || !manualName.trim()}
+                  onClick={() => { if (connectDialog) handleManualConnect(connectDialog); }}
+                >
+                  {connecting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding…</>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4 mr-2" />Add account</>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  disabled={connecting}
+                  onClick={() => { setDialogMode("oauth"); setConnectError(null); }}
+                >
+                  Back
+                </Button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground text-center">
-              Need help?{" "}
-              <a
-                href={connectDialog?.docsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline"
-              >
-                {connectDialog?.label} developer docs
-              </a>
-            </p>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
