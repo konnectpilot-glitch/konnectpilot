@@ -111,16 +111,41 @@ No text overlays. Clean composition with strong visual hierarchy.`;
   // Use Pollinations.ai — free image generation, no API key required
   const encodedPrompt = encodeURIComponent(imagePrompt);
   const seed = Math.floor(Math.random() * 999999);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
+  const sourceUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
 
-  // Verify the image is actually reachable before returning
-  const check = await fetch(imageUrl, { method: "HEAD" });
-  if (!check.ok) {
-    res.status(500).json({ error: "Image generation failed — could not reach generation service" });
-    return;
+  // Fetch the image bytes server-side (Pollinations can take 30-90s to generate).
+  // We download and inline the image as a data URL so the browser does not have to
+  // wait through a second slow round-trip and risk cache eviction / broken images.
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    const imgRes = await fetch(sourceUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!imgRes.ok) {
+      res.status(502).json({ error: "Image generation service returned an error. Please try again." });
+      return;
+    }
+
+    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+    if (!contentType.startsWith("image/")) {
+      res.status(502).json({ error: "Image generation service returned invalid content. Please try again." });
+      return;
+    }
+
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const dataUrl = `data:${contentType};base64,${base64}`;
+
+    res.json({ imageUrl: dataUrl, prompt: imagePrompt });
+  } catch (err: any) {
+    const isTimeout = err?.name === "AbortError";
+    res.status(isTimeout ? 504 : 500).json({
+      error: isTimeout
+        ? "Image generation timed out. The AI service is busy — please try again."
+        : "Image generation failed. Please try again.",
+    });
   }
-
-  res.json({ imageUrl, prompt: imagePrompt });
 });
 
 router.post("/generate/video-script", requireAuth, async (req: any, res): Promise<void> => {
