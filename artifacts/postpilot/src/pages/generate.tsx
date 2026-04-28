@@ -9,6 +9,7 @@ import {
   getListPostsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
 import {
   Sparkles,
   Loader2,
@@ -67,6 +68,7 @@ export default function GeneratePage() {
   const generatePost = useGeneratePost();
   const savePost = useSaveGeneratedPost();
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
 
   // Reactively switch tab when URL changes (e.g. sidebar click)
   const search = useSearch();
@@ -128,9 +130,17 @@ export default function GeneratePage() {
     setImageLoading(true);
     setGeneratedImageUrl(null);
     try {
+      const token = await getToken();
+      if (!token) {
+        toast.error("Your session has expired. Please sign in again.");
+        return;
+      }
       const res = await fetch("/api/generate/image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           brandId: Number(data.brandId),
           postContent: data.topic || `${selectedBrand?.name} brand image`,
@@ -156,9 +166,17 @@ export default function GeneratePage() {
     setVideoLoading(true);
     setVideoScript(null);
     try {
+      const token = await getToken();
+      if (!token) {
+        toast.error("Your session has expired. Please sign in again.");
+        return;
+      }
       const res = await fetch("/api/generate/video-script", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           brandId: Number(data.brandId),
           topic: data.topic || null,
