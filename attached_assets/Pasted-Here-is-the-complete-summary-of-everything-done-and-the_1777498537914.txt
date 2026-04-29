@@ -1,0 +1,54 @@
+Here is the complete summary of everything done and the current state of your app:
+
+✅ What Was Successfully Completed
+STEP 5 — App Settings → Basic (all saved)
+
+App domains: 0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev ✓ (was already set)
+Privacy Policy URL: https://.../privacy ✓ saved
+Terms of Service URL: https://.../terms ✓ saved
+Category: "Business and pages" ✓ saved
+
+STEP 4 — Facebook Login OAuth Settings (all confirmed)
+Under Use cases → Facebook Login → Customize → Settings:
+
+Client OAuth login: Yes ✓
+Web OAuth login: Yes ✓
+Enforce HTTPS: Yes ✓
+Use Strict Mode for redirect URIs: Yes ✓
+Valid OAuth Redirect URIs — both added and saved:
+
+https://.../api/social-accounts/callback/facebook ✓
+https://.../api/social-accounts/callback/instagram ✓ (newly added)
+
+
+
+STEP 6 — App Roles
+
+Ali Akbar is already listed as an Administrator — no action needed, Administrators can test all permissions without being added as a Tester.
+
+Permissions "Ready for testing"
+
+email — Ready for testing ✓
+public_profile — Ready for testing ✓
+
+
+❌ Steps That Failed — With Explanation
+STEP 1 — App type: No "App type" field exists in the UI
+The new Meta Developer Portal no longer shows an explicit "App type" switcher on the Basic settings page. The app type (Consumer vs. Business) is set permanently at creation time and cannot be changed via the current UI.
+STEP 2 & 3 — "Manage everything on your Page" and Instagram use cases: Not available
+Error/finding: When clicking "Add use cases", the dialog showed only 1 available use case ("Create & manage app ads with Meta Ads Manager"). The portal explicitly states: "Create a new app if use cases you want to add aren't available."
+Root cause: This app was created as a Consumer type app. The use cases needed for KonnectPilot — "Manage everything on your Page" (which provides pages_manage_posts, pages_show_list, pages_read_engagement, pages_manage_metadata, pages_read_user_content) and the Instagram API use case — are only available for Business type apps.
+
+⚠️ Critical Next Step Required — Create a New Business App
+To get pages_manage_posts, pages_show_list, and all Instagram permissions, you need to create a brand-new Facebook app and select "Business" as the app type during creation. Then you can add the "Manage everything on your Page" and "Instagram API with Instagram Login" use cases.
+Here's what to do:
+
+Go to developers.facebook.com/apps/ → Create App
+When prompted for app type, choose Business (not Consumer)
+Name it "Konnect Pilot" (same or similar)
+Then follow Steps 2–6 from your original plan — all those use cases will be available
+
+Your existing app (1026829810520739) can remain and still handle the Facebook OAuth login for email + public_profile. But page/Instagram publishing requires a Business-type app.
+
+Current App Mode
+Development mode (Unpublished) — no changes made to live/publish status.
