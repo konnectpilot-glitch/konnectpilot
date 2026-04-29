@@ -1,4 +1,4 @@
-# PostPilot — AI Social Media Auto-Posting SaaS
+# KonnectPilot — AI Social Media Auto-Posting SaaS
 
 **By ClicknKonnect** | Built with React+Vite, Express 5, Drizzle ORM, Clerk Auth, Stripe, Anthropic Claude
 

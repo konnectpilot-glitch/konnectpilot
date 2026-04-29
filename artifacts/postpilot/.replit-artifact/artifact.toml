@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "PostPilot"
+title = "KonnectPilot"
 version = "1.0.0"
 id = "artifacts/postpilot"
 router = "path"

@@ -12,7 +12,7 @@ const features = [
   {
     icon: Clock,
     title: "Set It and Forget It",
-    description: "Configure your brands once. PostPilot handles daily content generation and publishing automatically.",
+    description: "Configure your brands once. KonnectPilot handles daily content generation and publishing automatically.",
   },
   {
     icon: BarChart3,
@@ -33,7 +33,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-lg text-foreground">PostPilot</span>
+            <span className="font-bold text-lg text-foreground">KonnectPilot</span>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/sign-in" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -57,7 +57,7 @@ export default function LandingPage() {
           <span className="text-primary block">without lifting a finger</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          PostPilot uses OpenAI GPT-4 to write, illustrate, and publish platform-specific social media content for your brands every single day — automatically.
+          KonnectPilot uses OpenAI GPT-4 to write, illustrate, and publish platform-specific social media content for your brands every single day — automatically.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
           <Link href="/sign-up" className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors">
@@ -179,7 +179,7 @@ export default function LandingPage() {
             <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
               <Zap className="w-3 h-3 text-white" />
             </div>
-            <span className="font-medium">PostPilot</span>
+            <span className="font-medium">KonnectPilot</span>
             <span>by ClicknKonnect</span>
           </div>
           <p>© 2026 ClicknKonnect. All rights reserved.</p>

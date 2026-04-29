@@ -53,7 +53,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Overview of your PostPilot activity</p>
+            <p className="text-muted-foreground text-sm mt-0.5">Overview of your KonnectPilot activity</p>
           </div>
           <div className="flex gap-2">
             <Link href="/brands/new" className="flex items-center gap-1.5 text-sm font-medium border border-border px-3 py-2 rounded-lg hover:bg-secondary transition-colors">

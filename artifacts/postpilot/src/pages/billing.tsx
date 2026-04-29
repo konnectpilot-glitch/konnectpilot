@@ -53,7 +53,7 @@ export default function BillingPage() {
       <div className="p-6 max-w-4xl mx-auto space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Billing</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your PostPilot subscription</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage your KonnectPilot subscription</p>
         </div>
 
         {/* Current plan card */}

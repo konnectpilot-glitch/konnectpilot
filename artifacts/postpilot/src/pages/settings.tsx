@@ -32,7 +32,7 @@ export default function SettingsPage() {
 
         <div className="bg-card border border-border rounded-xl p-5">
           <h2 className="font-semibold text-foreground mb-1">Sign Out</h2>
-          <p className="text-sm text-muted-foreground mb-4">Sign out of your PostPilot account on this device.</p>
+          <p className="text-sm text-muted-foreground mb-4">Sign out of your KonnectPilot account on this device.</p>
           <button
             onClick={() => signOut()}
             className="flex items-center gap-2 text-sm font-medium border border-border px-4 py-2 rounded-lg hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"

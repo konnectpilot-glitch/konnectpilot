@@ -188,7 +188,7 @@ export default function AccountsPage() {
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "not_configured") {
-          setConnectError(`${platform.label} OAuth login isn't set up yet (it requires platform approval that can take days). Use "Connect manually" below to add your account now and start using PostPilot right away.`);
+          setConnectError(`${platform.label} OAuth login isn't set up yet (it requires platform approval that can take days). Use "Connect manually" below to add your account now and start using KonnectPilot right away.`);
         } else {
           setConnectError(data.error ?? "Something went wrong. Please try again.");
         }
@@ -264,7 +264,7 @@ export default function AccountsPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground">Social Accounts</h1>
           <p className="text-muted-foreground mt-1">
-            Connect your social profiles so PostPilot can publish content automatically.
+            Connect your social profiles so KonnectPilot can publish content automatically.
           </p>
         </div>
 
@@ -355,7 +355,7 @@ export default function AccountsPage() {
           <div>
             <p className="text-sm font-medium text-foreground">How auto-posting works</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Once connected, PostPilot will use your stored access tokens to publish generated
+              Once connected, KonnectPilot will use your stored access tokens to publish generated
               posts directly to each platform at the schedule set in your Brand settings.
               Tokens are encrypted and never shared.
             </p>
@@ -383,7 +383,7 @@ export default function AccountsPage() {
             <DialogDescription>
               {dialogMode === "manual"
                 ? "Add your account details below. You can update these any time."
-                : "Authorise PostPilot to publish on your behalf."}
+                : "Authorise KonnectPilot to publish on your behalf."}
             </DialogDescription>
           </DialogHeader>
 
@@ -478,7 +478,7 @@ export default function AccountsPage() {
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2 text-xs text-amber-800">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>
-                  Manual mode lets you organise your accounts in PostPilot now.
+                  Manual mode lets you organise your accounts in KonnectPilot now.
                   To enable automatic posting, the {connectDialog?.label} OAuth integration will need to be set up later.
                 </span>
               </div>
@@ -514,7 +514,7 @@ export default function AccountsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This account will be removed. PostPilot will no longer be able to post to it.
+              This account will be removed. KonnectPilot will no longer be able to post to it.
               You can reconnect at any time.
             </AlertDialogDescription>
           </AlertDialogHeader>

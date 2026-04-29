@@ -175,13 +175,13 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: "Welcome back to PostPilot",
+            title: "Welcome back to KonnectPilot",
             subtitle: "Sign in to your account",
           },
         },
         signUp: {
           start: {
-            title: "Get started with PostPilot",
+            title: "Get started with KonnectPilot",
             subtitle: "Create your free account",
           },
         },
