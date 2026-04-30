@@ -391,6 +391,46 @@ router.get("/social-accounts", requireAuth, async (req: any, res): Promise<void>
   res.json(accounts.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() })));
 });
 
+// Returns the Facebook Pages the connected account admins. Used by the UI to
+// warn users who connected a personal Facebook profile but don't admin any
+// Pages — Meta's Graph API only allows posting to Pages, not personal feeds.
+router.get("/social-accounts/facebook/pages", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const [account] = await db
+    .select()
+    .from(socialAccountsTable)
+    .where(
+      and(
+        eq(socialAccountsTable.userId, user.id),
+        eq(socialAccountsTable.platform, "facebook"),
+        eq(socialAccountsTable.isActive, true),
+      ),
+    );
+  if (!account) {
+    res.status(404).json({ error: "Facebook account not connected" });
+    return;
+  }
+  if (account.accessToken.startsWith("manual:")) {
+    res.json({ pages: [], manual: true });
+    return;
+  }
+  try {
+    const r = await fetch(
+      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name&access_token=${encodeURIComponent(account.accessToken)}`,
+    );
+    if (!r.ok) {
+      const body = await r.text();
+      res.status(502).json({ error: `Facebook API error: ${body}` });
+      return;
+    }
+    const data = (await r.json()) as { data?: { id: string; name: string }[] };
+    res.json({ pages: data.data ?? [] });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to fetch Facebook Pages");
+    res.status(502).json({ error: err?.message ?? "Failed to fetch Pages" });
+  }
+});
+
 router.delete("/social-accounts/:id", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);
   const id = parseInt(req.params.id, 10);

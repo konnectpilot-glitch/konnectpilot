@@ -13,6 +13,7 @@ import {
   Info,
   Loader2,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -113,6 +114,19 @@ function useListSocialAccounts() {
   });
 }
 
+function useFacebookPages(enabled: boolean) {
+  return useQuery<{ pages: { id: string; name: string }[]; manual?: boolean }>({
+    queryKey: ["facebook-pages"],
+    enabled,
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/social-accounts/facebook/pages`);
+      if (!res.ok) throw new Error("Failed to load pages");
+      return res.json();
+    },
+    retry: false,
+  });
+}
+
 function useDisconnectAccount() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -130,6 +144,12 @@ function useDisconnectAccount() {
 
 export default function AccountsPage() {
   const { data: connected = [], isLoading } = useListSocialAccounts();
+  const facebookConnected = connected.some(
+    (a) => a.platform === "facebook" && a.isActive,
+  );
+  const { data: fbPagesData } = useFacebookPages(facebookConnected);
+  const fbHasNoPages =
+    facebookConnected && !!fbPagesData && !fbPagesData.manual && fbPagesData.pages.length === 0;
   const disconnect = useDisconnectAccount();
   const { getToken } = useAuth();
   const [connectDialog, setConnectDialog] = useState<typeof PLATFORMS[0] | null>(null);
@@ -318,6 +338,36 @@ export default function AccountsPage() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {platform.id === "facebook" && fbHasNoPages && (
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2 text-sm">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-amber-900">No Facebook Page found</p>
+                        <p className="text-xs text-amber-800 mt-1">
+                          Facebook only allows posting to a Page (not a personal profile).
+                          Create a free Page, then reconnect this account so KonnectPilot can see it.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <a
+                            href="https://www.facebook.com/pages/create"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900 underline"
+                          >
+                            Create a Facebook Page
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            onClick={() => openConnectDialog(platform)}
+                            className="text-xs font-semibold text-amber-900 underline"
+                          >
+                            Reconnect Facebook
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
