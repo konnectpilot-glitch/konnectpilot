@@ -50,9 +50,9 @@ type PlatformConfig = {
 const PLATFORMS: Record<string, PlatformConfig> = {
   facebook: {
     envKeys: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
-    scope: "public_profile,email",
+    scope: "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content",
     authUrl: (redirectUri, state) =>
-      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=public_profile,email&response_type=code&state=${state}`,
+      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content")}&response_type=code&state=${state}`,
     exchangeToken: async (code, redirectUri) => {
       const params = new URLSearchParams({
         client_id: process.env.FACEBOOK_APP_ID!,
@@ -81,9 +81,9 @@ const PLATFORMS: Record<string, PlatformConfig> = {
   },
   instagram: {
     envKeys: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
-    scope: "public_profile,email",
+    scope: "public_profile,pages_show_list,instagram_basic,instagram_content_publish,instagram_manage_insights",
     authUrl: (redirectUri, state) =>
-      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=public_profile,email&response_type=code&state=${state}`,
+      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("public_profile,pages_show_list,instagram_basic,instagram_content_publish,instagram_manage_insights")}&response_type=code&state=${state}`,
     exchangeToken: async (code, redirectUri) => {
       const params = new URLSearchParams({
         client_id: process.env.FACEBOOK_APP_ID!,

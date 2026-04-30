@@ -1,0 +1,89 @@
+## ✅ STEP 8 — Final Report: KonnectPilot Facebook App
+
+---
+
+### 🆔 App Credentials
+
+| Field | Value |
+|---|---|
+| **App Name** | Konnect Pilot *(Facebook stored it with a space — "KonnectPilot" is not allowed as a single word by their system)* |
+| **App ID** | `1024198350029935` |
+| **App Secret** | `d7bf814d250ba1f979a11051720bc858` |
+| **App Type** | Business |
+| **App Status** | **Unpublished (Development mode)** ✅ |
+
+---
+
+### 🔐 Facebook Login for Business — OAuth Settings
+
+| Setting | Value |
+|---|---|
+| Client OAuth login | **Yes** ✅ |
+| Web OAuth login | **Yes** ✅ |
+| Enforce HTTPS | **Yes** ✅ |
+| Use Strict Mode for redirect URIs | **Yes** ✅ |
+
+**Valid OAuth Redirect URIs (both confirmed present):**
+1. `https://0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev/api/social-accounts/callback/facebook`
+2. `https://0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev/api/social-accounts/callback/instagram`
+
+---
+
+### ✅ Permissions — "Ready for testing"
+
+**Use Case: Manage everything on your Page (Pages API)**
+
+| Permission | Status |
+|---|---|
+| `pages_manage_metadata` | Ready for testing ✅ |
+| `pages_manage_posts` | Ready for testing ✅ |
+| `pages_read_engagement` | Ready for testing ✅ |
+| `pages_read_user_content` | Ready for testing ✅ |
+| `pages_show_list` | Ready for testing ✅ |
+| `public_profile` | Ready for testing ✅ *(automatically granted to all apps)* |
+| `business_management` | Ready for testing ✅ *(auto-added by Facebook)* |
+
+**Use Case: Manage messaging & content on Instagram**
+
+| Permission | Status |
+|---|---|
+| `instagram_basic` | Ready for testing ✅ |
+| `instagram_content_publish` | Ready for testing ✅ |
+| `instagram_manage_insights` | Ready for testing ✅ |
+
+---
+
+### ⚠️ Steps That Deviated from Original Instructions
+
+**"Authenticate and request data from users with Facebook Login" use case — not available.** This use case was grayed out during app creation because it is incompatible with Business-type apps that include the Pages use case. Facebook automatically included **Facebook Login for Business** instead, which is the correct Business-app equivalent. The OAuth redirect URIs and all toggles were configured there successfully.
+
+**`email` and `public_profile` in Facebook Login use case** — There is no separate "Authenticate with Facebook Login" use case in this Business app. `public_profile` is instead automatically granted (confirmed "Ready for testing" in the Pages use case). `email` is optionally available to add to the Pages use case if needed, but was not required by the core flow for posting to Pages and Instagram.
+
+---
+
+### 👤 App Roles
+
+| Person | Role |
+|---|---|
+| Ali Akbar | Administrator ✅ |
+
+---
+
+### 🔒 Old App — Untouched
+
+Old app (ID: `1026829810520739`) was **not modified or deleted**. All work was done exclusively on the new app.
+
+---
+
+### 🔧 App Settings (Basic)
+
+| Field | Value |
+|---|---|
+| App Domain | `0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev` |
+| Privacy Policy URL | `https://0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev/privacy` |
+| Terms of Service URL | `https://0ab59fdb-e61d-46d6-9de9-b8de9b59aa9f-00-2v2tt5cu95qdl.riker.replit.dev/terms` |
+| Category | Business and pages |
+
+---
+
+The app is fully configured and ready for development testing. Your `.env` should use `FACEBOOK_APP_ID=1024198350029935` and `FACEBOOK_APP_SECRET=d7bf814d250ba1f979a11051720bc858`.
