@@ -5,8 +5,9 @@ import {
   useDeletePost,
   getListPostsQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { FileText, Trash2, Copy, Check, Facebook, Instagram, Linkedin, Search, Filter } from "lucide-react";
+import { useAuth } from "@clerk/react";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { FileText, Trash2, Copy, Check, Facebook, Instagram, Linkedin, Search, RotateCcw, Loader2 } from "lucide-react";
 import { FaTiktok } from "react-icons/fa";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
@@ -34,6 +35,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PostsPage() {
+  const { getToken } = useAuth();
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -45,6 +47,24 @@ export default function PostsPage() {
   });
   const deletePost = useDeletePost();
   const queryClient = useQueryClient();
+
+  const retryPost = useMutation({
+    mutationFn: async (id: number) => {
+      const token = await getToken();
+      const res = await fetch(`/api/posts/${id}/retry`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token ?? ""}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Retry failed");
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
+      toast.success("Post published");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+  });
 
   const filtered = posts?.filter(p =>
     !search || p.content.toLowerCase().includes(search.toLowerCase())
@@ -150,6 +170,19 @@ export default function PostsPage() {
                     <StatusBadge status={post.status} />
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {post.status === "failed" && (
+                      <button
+                        onClick={() => retryPost.mutate(post.id)}
+                        disabled={retryPost.isPending && retryPost.variables === post.id}
+                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+                        title="Retry publishing"
+                      >
+                        {retryPost.isPending && retryPost.variables === post.id
+                          ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+                          : <RotateCcw className="w-4 h-4 text-muted-foreground" />
+                        }
+                      </button>
+                    )}
                     <button
                       onClick={() => handleCopy(post.id, post.content)}
                       className="p-1.5 rounded-lg hover:bg-secondary transition-colors"

@@ -7,6 +7,7 @@ import {
   DeletePostParams,
 } from "@workspace/api-zod";
 import { requireAuth, ensureUser } from "./users";
+import { retryPost } from "../lib/scheduler";
 
 const router: IRouter = Router();
 
@@ -98,6 +99,37 @@ router.delete("/posts/:id", requireAuth, async (req: any, res): Promise<void> =>
 
   await db.delete(postsTable).where(eq(postsTable.id, params.data.id));
   res.sendStatus(204);
+});
+
+router.post("/posts/:id/retry", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid post id" });
+    return;
+  }
+
+  // Look up the post first so we can return 404 vs 409 cleanly.
+  const [existing] = await db
+    .select({ id: postsTable.id, status: postsTable.status })
+    .from(postsTable)
+    .innerJoin(brandsTable, eq(postsTable.brandId, brandsTable.id))
+    .where(and(eq(postsTable.id, id), eq(brandsTable.userId, user.id)));
+  if (!existing) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  if (existing.status !== "failed") {
+    res.status(409).json({ error: `Cannot retry a post with status "${existing.status}".` });
+    return;
+  }
+
+  const result = await retryPost(id, user.id);
+  if (result.ok) {
+    res.json({ ok: true, status: result.status, platformPostId: result.platformPostId });
+    return;
+  }
+  res.status(502).json({ ok: false, status: result.status, error: result.error });
 });
 
 export default router;

@@ -96,6 +96,91 @@ async function publishOnePlatform(
 }
 
 /**
+ * Manually retry publishing a single failed post. Re-uses the existing
+ * caption + image when available; only regenerates pieces that are missing.
+ * Returns the updated post status.
+ */
+export async function retryPost(postId: number, userId: number): Promise<
+  | { ok: true; status: "published"; platformPostId: string | null }
+  | { ok: false; status: "failed"; error: string }
+> {
+  // Verify ownership via brand
+  const [row] = await db
+    .select({ post: postsTable, brand: brandsTable })
+    .from(postsTable)
+    .innerJoin(brandsTable, eq(postsTable.brandId, brandsTable.id))
+    .where(and(eq(postsTable.id, postId), eq(brandsTable.userId, userId)));
+  if (!row) {
+    return { ok: false, status: "failed", error: "Post not found" };
+  }
+  const { post, brand } = row;
+
+  const [account] = await db
+    .select()
+    .from(socialAccountsTable)
+    .where(
+      and(
+        eq(socialAccountsTable.userId, userId),
+        eq(socialAccountsTable.platform, post.platform),
+        eq(socialAccountsTable.isActive, true),
+      ),
+    );
+  if (!account) {
+    const msg = `No connected ${post.platform} account.`;
+    await db
+      .update(postsTable)
+      .set({ status: "failed", errorMessage: msg })
+      .where(eq(postsTable.id, postId));
+    return { ok: false, status: "failed", error: msg };
+  }
+
+  // Reuse existing image/caption when present so retry is fast and consistent.
+  let imageUrl = post.imageUrl;
+  if (!imageUrl) {
+    const prompt = buildImagePrompt(brand, null, null);
+    imageUrl = buildImageUrl(prompt);
+    await prewarmImage(imageUrl);
+  }
+
+  let caption = post.content;
+  if (!caption || caption.trim().length === 0) {
+    try {
+      caption = await generateContent(brand, post.platform, null);
+    } catch (err: any) {
+      const msg = `Caption generation failed: ${err?.message ?? err}`;
+      await db
+        .update(postsTable)
+        .set({ status: "failed", imageUrl, errorMessage: msg })
+        .where(eq(postsTable.id, postId));
+      return { ok: false, status: "failed", error: msg };
+    }
+  }
+
+  const result = await publishOnePlatform(post.platform, account, imageUrl, caption);
+  await db
+    .update(postsTable)
+    .set({
+      content: caption,
+      imageUrl,
+      status: result.ok ? "published" : "failed",
+      publishedAt: result.ok ? new Date() : null,
+      platformPostId: result.platformPostId ?? null,
+      errorMessage: result.ok ? null : result.error ?? "Unknown error",
+    })
+    .where(eq(postsTable.id, postId));
+
+  logger.info(
+    { postId, platform: post.platform, ok: result.ok, error: result.error },
+    "Manual retry result",
+  );
+
+  if (result.ok) {
+    return { ok: true, status: "published", platformPostId: result.platformPostId ?? null };
+  }
+  return { ok: false, status: "failed", error: result.error ?? "Unknown error" };
+}
+
+/**
  * Atomically claim a slot for a (schedule, platform, slotTime) tuple by
  * inserting a placeholder row. The unique index on (schedule_id,
  * scheduled_for, platform) makes concurrent claims fail with a unique

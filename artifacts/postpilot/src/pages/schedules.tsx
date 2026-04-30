@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   ImageIcon,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -328,6 +329,25 @@ function ScheduleForm({
 
 function ScheduleHistory({ scheduleId, token }: { scheduleId: number; token: string | null }) {
   const { data: posts = [], isLoading } = useSchedulePosts(scheduleId, token);
+  const queryClient = useQueryClient();
+
+  const retry = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${BASE_URL}/api/posts/${id}/retry`, {
+        method: "POST",
+        headers: authHeaders(token),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Retry failed");
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule-posts", scheduleId] });
+      toast.success("Post published");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
@@ -371,6 +391,21 @@ function ScheduleHistory({ scheduleId, token }: { scheduleId: number; token: str
               <span className="text-xs text-muted-foreground ml-auto">
                 {new Date(p.scheduledFor ?? p.createdAt).toLocaleString()}
               </span>
+              {p.status === "failed" && (
+                <button
+                  onClick={() => retry.mutate(p.id)}
+                  disabled={retry.isPending && retry.variables === p.id}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                  title="Retry publishing"
+                >
+                  {retry.isPending && retry.variables === p.id ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3 h-3" />
+                  )}
+                  Retry
+                </button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground line-clamp-2">
               {p.content || p.errorMessage || "—"}
