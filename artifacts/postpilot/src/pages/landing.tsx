@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { Zap, Check, ArrowRight, Facebook, Instagram, Linkedin, Clock, Bot, BarChart3 } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
 import { useListPlans } from "@workspace/api-client-react";
 
 const features = [
@@ -17,7 +16,7 @@ const features = [
   {
     icon: BarChart3,
     title: "Multi-Platform",
-    description: "One tool to manage Facebook, Instagram, LinkedIn, and TikTok for all your brands.",
+    description: "One tool to manage Facebook, Instagram, and LinkedIn for all your brands.",
   },
 ];
 
@@ -82,10 +81,6 @@ export default function LandingPage() {
           <div className="flex items-center gap-1.5 text-sm">
             <Linkedin className="w-5 h-5 text-blue-700" />
             <span>LinkedIn</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
-            <FaTiktok className="w-4 h-4 text-foreground" />
-            <span>TikTok</span>
           </div>
         </div>
       </section>

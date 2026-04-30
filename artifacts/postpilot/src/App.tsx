@@ -15,6 +15,7 @@ import PostsPage from "@/pages/posts";
 import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
+import SchedulesPage from "@/pages/schedules";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -205,6 +206,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />
+          <Route path="/schedules" component={() => <ProtectedRoute component={SchedulesPage} />} />
           <Route component={NotFound} />
         </Switch>
         <Toaster />

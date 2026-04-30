@@ -28,14 +28,12 @@ import {
   Clock,
   ChevronRight,
 } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
 import { toast } from "sonner";
 
 const PLATFORMS = [
   { id: "facebook", label: "Facebook", icon: <Facebook className="w-4 h-4 text-blue-600" /> },
   { id: "instagram", label: "Instagram", icon: <Instagram className="w-4 h-4 text-pink-600" /> },
   { id: "linkedin", label: "LinkedIn", icon: <Linkedin className="w-4 h-4 text-blue-700" /> },
-  { id: "tiktok", label: "TikTok", icon: <FaTiktok className="w-3.5 h-3.5 text-foreground" /> },
 ];
 
 type Mode = "text" | "image" | "video";

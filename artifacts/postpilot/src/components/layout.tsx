@@ -15,6 +15,7 @@ import {
   Clapperboard,
   ChevronDown,
   Share2,
+  CalendarClock,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const navItems = [
       { href: "/generate?tab=video", label: "Video Script", icon: Clapperboard },
     ],
   },
+  { href: "/schedules", label: "Auto Post", icon: CalendarClock },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/billing", label: "Billing", icon: CreditCard },
