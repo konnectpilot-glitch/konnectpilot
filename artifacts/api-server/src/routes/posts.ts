@@ -1,75 +1,44 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db, postsTable, brandsTable } from "@workspace/db";
 import {
   ListPostsResponse,
   ListPostsQueryParams,
   DeletePostParams,
 } from "@workspace/api-zod";
-import { requireAuth, ensureUser } from "./users";
+import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import { retryPost } from "../lib/scheduler";
 
 const router: IRouter = Router();
 
-router.get("/posts", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/posts", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const params = ListPostsQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  // Get brand IDs belonging to this user
-  const userBrands = await db
+  // Brand name lookup
+  const wsBrands = await db
     .select({ id: brandsTable.id, name: brandsTable.name })
     .from(brandsTable)
-    .where(eq(brandsTable.userId, user.id));
+    .where(eq(brandsTable.workspaceId, req.workspaceId));
+  const brandMap = new Map(wsBrands.map((b) => [b.id, b.name]));
 
-  if (userBrands.length === 0) {
-    res.json([]);
-    return;
-  }
-
-  const brandMap = new Map(userBrands.map(b => [b.id, b.name]));
-  const brandIds = userBrands.map(b => b.id);
-
-  let query = db
-    .select()
-    .from(postsTable)
-    .where(sql`${postsTable.brandId} = ANY(${brandIds})`)
-    .orderBy(desc(postsTable.createdAt))
-    .$dynamic();
-
-  if (params.data.brandId) {
-    query = query.where(eq(postsTable.brandId, params.data.brandId));
-  }
-  if (params.data.platform) {
-    query = query.where(eq(postsTable.platform, params.data.platform));
-  }
-  if (params.data.status) {
-    query = query.where(eq(postsTable.status, params.data.status));
-  }
-  if (params.data.limit) {
-    query = query.limit(params.data.limit);
-  }
-  if (params.data.offset) {
-    query = query.offset(params.data.offset);
-  }
+  const conditions = [eq(postsTable.workspaceId, req.workspaceId)];
+  if (params.data.brandId) conditions.push(eq(postsTable.brandId, params.data.brandId));
+  if (params.data.platform) conditions.push(eq(postsTable.platform, params.data.platform));
+  if (params.data.status) conditions.push(eq(postsTable.status, params.data.status));
 
   const posts = await db
     .select()
     .from(postsTable)
-    .where(sql`${postsTable.brandId} = ANY(ARRAY[${sql.raw(brandIds.join(","))}]::int[])`)
+    .where(and(...conditions))
     .orderBy(desc(postsTable.createdAt))
     .limit(params.data.limit ?? 100)
     .offset(params.data.offset ?? 0);
 
-  const filteredPosts = posts
-    .filter(p => !params.data.brandId || p.brandId === params.data.brandId)
-    .filter(p => !params.data.platform || p.platform === params.data.platform)
-    .filter(p => !params.data.status || p.status === params.data.status);
-
-  res.json(ListPostsResponse.parse(filteredPosts.map(p => ({
+  res.json(ListPostsResponse.parse(posts.map((p) => ({
     ...p,
     brandName: brandMap.get(p.brandId) ?? null,
     imageUrl: p.imageUrl ?? null,
@@ -79,20 +48,21 @@ router.get("/posts", requireAuth, async (req: any, res): Promise<void> => {
   }))));
 });
 
-router.delete("/posts/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.delete("/posts/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const params = DeletePostParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  // Verify post belongs to user's brand
   const [post] = await db
-    .select({ postId: postsTable.id, brandUserId: brandsTable.userId })
+    .select({ id: postsTable.id })
     .from(postsTable)
-    .innerJoin(brandsTable, eq(postsTable.brandId, brandsTable.id))
-    .where(and(eq(postsTable.id, params.data.id), eq(brandsTable.userId, user.id)));
+    .where(and(eq(postsTable.id, params.data.id), eq(postsTable.workspaceId, req.workspaceId)));
 
   if (!post) {
     res.status(404).json({ error: "Post not found" });
@@ -103,20 +73,21 @@ router.delete("/posts/:id", requireAuth, async (req: any, res): Promise<void> =>
   res.sendStatus(204);
 });
 
-router.post("/posts/:id/retry", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/posts/:id/retry", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "Invalid post id" });
     return;
   }
 
-  // Look up the post first so we can return 404 vs 409 cleanly.
   const [existing] = await db
     .select({ id: postsTable.id, status: postsTable.status })
     .from(postsTable)
-    .innerJoin(brandsTable, eq(postsTable.brandId, brandsTable.id))
-    .where(and(eq(postsTable.id, id), eq(brandsTable.userId, user.id)));
+    .where(and(eq(postsTable.id, id), eq(postsTable.workspaceId, req.workspaceId)));
   if (!existing) {
     res.status(404).json({ error: "Post not found" });
     return;
@@ -126,7 +97,7 @@ router.post("/posts/:id/retry", requireAuth, async (req: any, res): Promise<void
     return;
   }
 
-  const result = await retryPost(id, user.id);
+  const result = await retryPost(id, req.workspaceId);
   if (result.ok) {
     res.json({ ok: true, status: result.status, platformPostId: result.platformPostId });
     return;

@@ -23,11 +23,21 @@ lib/api-client-react/      → Generated React Query hooks
 - **Payments**: Stripe subscriptions (Starter $19, Pro $49, Agency $99)
 
 ### Database Schema
-- `users` — Clerk users synced on first request; has plan, stripeCustomerId, stripeSubscriptionId
-- `brands` — Brand configurations per user (name, industry, tone, targetAudience, keywords, platforms, postTime)
-- `posts` — Generated/published post history (brandId, scheduleId, platform, content, imageUrl, status, scheduledFor, publishedAt, platformPostId, errorMessage). Unique index on (scheduleId, scheduledFor, platform) for atomic slot claiming.
-- `posting_schedules` — Auto-post schedules per user (brandId, platforms[], postTimes[] in UTC HH:MM, timezone, contentPrompt, imageStyle, isActive, lastRunAt)
-- `social_accounts` — OAuth connections (Facebook, Instagram, LinkedIn) with accessToken/refreshToken/platformUserId
+- `users` — Clerk users synced on first request; has plan, stripeCustomerId, stripeSubscriptionId, activeWorkspaceId
+- `workspaces` — Team workspaces (name, isPersonal, requireApproval). Each user gets a Personal workspace on first request.
+- `workspace_members` — User<->workspace membership with role (owner/admin/editor/viewer). Unique idx (workspaceId, userId).
+- `brands` — Brand configurations scoped to workspace (workspaceId, name, industry, tone, targetAudience, keywords, platforms, postTime)
+- `posts` — Generated/published post history scoped to workspace. Adds submittedById/approvedById/approvedAt and "pending_approval" + "rejected" statuses. Unique index on (scheduleId, scheduledFor, platform) for atomic slot claiming.
+- `post_comments` — Threaded comments on posts (postId, userId, parentId self-FK, content)
+- `posting_schedules` — Auto-post schedules scoped to workspace (workspaceId, brandId, platforms[], postTimes[] in UTC HH:MM, timezone, contentPrompt, imageStyle, isActive, lastRunAt)
+- `social_accounts` — OAuth connections scoped to workspace (workspaceId, accessToken/refreshToken/platformUserId)
+
+### Team Workspaces & Approval Workflow
+- Every API request resolves the active workspace via `X-Workspace-Id` header (sent by the React frontend) or falls back to `users.activeWorkspaceId`. Middleware `requireWorkspace` populates `req.workspace`/`workspaceId`/`workspaceRole`.
+- Role ranking: viewer < editor < admin < owner. Writes require editor; deletes/connects/approvals require admin.
+- When `workspace.requireApproval=true`, the scheduler parks newly-published posts in `pending_approval` instead of publishing immediately. Editors can submit a `generated`/`rejected` post (`POST /posts/:id/submit`) and admins approve (`POST /posts/:id/approve`) or reject (`POST /posts/:id/reject`). Approving a non-scheduled post optionally publishes it inline.
+- Workspace switcher lives in the layout header; the React `WorkspaceProvider` registers an `extraHeadersProvider` on the api-client-react custom fetch that injects `X-Workspace-Id` on every generated query/mutation.
+- Threaded comments panel on the Posts page (`/posts`) lets any workspace member comment; deletes are restricted to the comment author or admins.
 
 ## API Routes
 

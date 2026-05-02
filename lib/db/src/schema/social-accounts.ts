@@ -4,6 +4,7 @@ import { usersTable } from "./users";
 export const socialAccountsTable = pgTable("social_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  workspaceId: integer("workspace_id"),
   platform: text("platform").notNull(),
   platformUserId: text("platform_user_id").notNull(),
   accountName: text("account_name").notNull(),

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, brandsTable, usersTable } from "@workspace/db";
+import { db, brandsTable } from "@workspace/db";
 import {
   ListBrandsResponse,
   GetBrandResponse,
@@ -10,8 +10,7 @@ import {
   UpdateBrandParams,
   DeleteBrandParams,
 } from "@workspace/api-zod";
-import { requireAuth } from "./users";
-import { ensureUser } from "./users";
+import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 
 const router: IRouter = Router();
 
@@ -22,12 +21,11 @@ const PLAN_BRAND_LIMITS: Record<string, number | null> = {
   agency: null, // unlimited
 };
 
-router.get("/brands", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/brands", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const brands = await db
     .select()
     .from(brandsTable)
-    .where(eq(brandsTable.userId, user.id))
+    .where(eq(brandsTable.workspaceId, req.workspaceId))
     .orderBy(brandsTable.createdAt);
 
   res.json(ListBrandsResponse.parse(brands.map(b => ({
@@ -36,18 +34,21 @@ router.get("/brands", requireAuth, async (req: any, res): Promise<void> => {
   }))));
 });
 
-router.post("/brands", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/brands", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const parsed = CreateBrandBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  // Check plan limits
-  const limit = PLAN_BRAND_LIMITS[user.plan] ?? null;
+  // Plan limits scoped per workspace
+  const limit = PLAN_BRAND_LIMITS[req.user.plan] ?? null;
   if (limit !== null) {
-    const existing = await db.select().from(brandsTable).where(eq(brandsTable.userId, user.id));
+    const existing = await db.select().from(brandsTable).where(eq(brandsTable.workspaceId, req.workspaceId));
     if (existing.length >= limit) {
       res.status(403).json({ error: `Your plan allows a maximum of ${limit} brand(s). Please upgrade.` });
       return;
@@ -57,7 +58,8 @@ router.post("/brands", requireAuth, async (req: any, res): Promise<void> => {
   const [brand] = await db
     .insert(brandsTable)
     .values({
-      userId: user.id,
+      userId: req.user.id,
+      workspaceId: req.workspaceId,
       name: parsed.data.name,
       industry: parsed.data.industry,
       tone: parsed.data.tone,
@@ -74,8 +76,7 @@ router.post("/brands", requireAuth, async (req: any, res): Promise<void> => {
   }));
 });
 
-router.get("/brands/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/brands/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const params = GetBrandParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -85,7 +86,7 @@ router.get("/brands/:id", requireAuth, async (req: any, res): Promise<void> => {
   const [brand] = await db
     .select()
     .from(brandsTable)
-    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.userId, user.id)));
+    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.workspaceId, req.workspaceId)));
 
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
@@ -98,8 +99,11 @@ router.get("/brands/:id", requireAuth, async (req: any, res): Promise<void> => {
   }));
 });
 
-router.patch("/brands/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.patch("/brands/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const params = UpdateBrandParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -125,7 +129,7 @@ router.patch("/brands/:id", requireAuth, async (req: any, res): Promise<void> =>
   const [brand] = await db
     .update(brandsTable)
     .set(updates)
-    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.userId, user.id)))
+    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.workspaceId, req.workspaceId)))
     .returning();
 
   if (!brand) {
@@ -139,8 +143,11 @@ router.patch("/brands/:id", requireAuth, async (req: any, res): Promise<void> =>
   }));
 });
 
-router.delete("/brands/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.delete("/brands/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+    res.status(403).json({ error: "Admin role required" });
+    return;
+  }
   const params = DeleteBrandParams.safeParse({ id: req.params.id });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -149,7 +156,7 @@ router.delete("/brands/:id", requireAuth, async (req: any, res): Promise<void> =
 
   const [deleted] = await db
     .delete(brandsTable)
-    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.userId, user.id)))
+    .where(and(eq(brandsTable.id, params.data.id), eq(brandsTable.workspaceId, req.workspaceId)))
     .returning();
 
   if (!deleted) {

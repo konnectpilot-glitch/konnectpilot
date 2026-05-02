@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { WorkspaceProvider } from "@/lib/workspaceContext";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Redirect, Router as WouterRouter } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -239,6 +240,7 @@ function ClerkProviderWithRoutes() {
         <ApiClientAuthBridge />
         <AffiliateAttributionBridge />
         <ClerkQueryClientCacheInvalidator />
+        <WorkspaceProvider>
         <Switch>
           <Route path="/" component={HomeRedirect} />
           <Route path="/features" component={FeaturesPage} />
@@ -267,6 +269,7 @@ function ClerkProviderWithRoutes() {
           <Route component={NotFound} />
         </Switch>
         <Toaster />
+        </WorkspaceProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

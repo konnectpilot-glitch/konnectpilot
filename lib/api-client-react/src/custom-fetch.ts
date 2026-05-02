@@ -17,6 +17,17 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _extraHeadersProvider: (() => Record<string, string> | null | undefined) | null = null;
+
+/**
+ * Register a function returning extra request headers (e.g. tenant/workspace id).
+ * Called on every request. Pass `null` to clear.
+ */
+export function setExtraHeadersProvider(
+  provider: (() => Record<string, string> | null | undefined) | null,
+): void {
+  _extraHeadersProvider = provider;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -358,6 +369,17 @@ export async function customFetch<T = unknown>(
 
   if (responseType === "json" && !headers.has("accept")) {
     headers.set("accept", DEFAULT_JSON_ACCEPT);
+  }
+
+  if (_extraHeadersProvider) {
+    const extra = _extraHeadersProvider();
+    if (extra) {
+      for (const [k, v] of Object.entries(extra)) {
+        if (!headers.has(k.toLowerCase()) && v != null) {
+          headers.set(k, String(v));
+        }
+      }
+    }
   }
 
   // Attach bearer token when an auth getter is configured and no

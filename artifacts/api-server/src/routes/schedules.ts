@@ -7,7 +7,7 @@ import {
   brandsTable,
   postsTable,
 } from "@workspace/db";
-import { requireAuth, ensureUser } from "./users";
+import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 
 const router: IRouter = Router();
 
@@ -26,8 +26,7 @@ const scheduleBodySchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-router.get("/schedules", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/schedules", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const rows = await db
     .select({
       id: postingSchedulesTable.id,
@@ -45,13 +44,16 @@ router.get("/schedules", requireAuth, async (req: any, res): Promise<void> => {
     })
     .from(postingSchedulesTable)
     .innerJoin(brandsTable, eq(brandsTable.id, postingSchedulesTable.brandId))
-    .where(eq(postingSchedulesTable.userId, user.id))
+    .where(eq(postingSchedulesTable.workspaceId, req.workspaceId))
     .orderBy(desc(postingSchedulesTable.createdAt));
   res.json(rows);
 });
 
-router.post("/schedules", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/schedules", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const parsed = scheduleBodySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -60,7 +62,7 @@ router.post("/schedules", requireAuth, async (req: any, res): Promise<void> => {
   const [brand] = await db
     .select()
     .from(brandsTable)
-    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.userId, user.id)));
+    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.workspaceId, req.workspaceId)));
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
     return;
@@ -68,7 +70,8 @@ router.post("/schedules", requireAuth, async (req: any, res): Promise<void> => {
   const [row] = await db
     .insert(postingSchedulesTable)
     .values({
-      userId: user.id,
+      userId: req.user.id,
+      workspaceId: req.workspaceId,
       brandId: parsed.data.brandId,
       name: parsed.data.name,
       platforms: parsed.data.platforms,
@@ -82,8 +85,11 @@ router.post("/schedules", requireAuth, async (req: any, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/schedules/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.patch("/schedules/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -97,18 +103,18 @@ router.patch("/schedules/:id", requireAuth, async (req: any, res): Promise<void>
   const [existing] = await db
     .select()
     .from(postingSchedulesTable)
-    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.userId, user.id)));
+    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.workspaceId, req.workspaceId)));
   if (!existing) {
     res.status(404).json({ error: "Schedule not found" });
     return;
   }
 
-  // Tenant isolation: if brandId is being changed, verify it belongs to this user.
+  // Tenant isolation: if brandId is being changed, verify it belongs to this workspace.
   if (parsed.data.brandId !== undefined && parsed.data.brandId !== existing.brandId) {
     const [brand] = await db
       .select({ id: brandsTable.id })
       .from(brandsTable)
-      .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.userId, user.id)));
+      .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.workspaceId, req.workspaceId)));
     if (!brand) {
       res.status(404).json({ error: "Brand not found" });
       return;
@@ -133,8 +139,11 @@ router.patch("/schedules/:id", requireAuth, async (req: any, res): Promise<void>
   res.json(updated);
 });
 
-router.delete("/schedules/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.delete("/schedules/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+    res.status(403).json({ error: "Admin role required" });
+    return;
+  }
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -142,12 +151,11 @@ router.delete("/schedules/:id", requireAuth, async (req: any, res): Promise<void
   }
   await db
     .delete(postingSchedulesTable)
-    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.userId, user.id)));
+    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.workspaceId, req.workspaceId)));
   res.status(204).end();
 });
 
-router.get("/schedules/:id/posts", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/schedules/:id/posts", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -156,7 +164,7 @@ router.get("/schedules/:id/posts", requireAuth, async (req: any, res): Promise<v
   const [schedule] = await db
     .select()
     .from(postingSchedulesTable)
-    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.userId, user.id)));
+    .where(and(eq(postingSchedulesTable.id, id), eq(postingSchedulesTable.workspaceId, req.workspaceId)));
   if (!schedule) {
     res.status(404).json({ error: "Schedule not found" });
     return;

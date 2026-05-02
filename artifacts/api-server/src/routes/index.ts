@@ -11,13 +11,17 @@ import schedulesRouter from "./schedules";
 import usageRouter from "./usage";
 import adminRouter from "./admin";
 import affiliateRouter from "./affiliate";
+import workspacesRouter from "./workspaces";
+import postCommentsRouter from "./post-comments";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(usersRouter);
+router.use(workspacesRouter);
 router.use(brandsRouter);
 router.use(postsRouter);
+router.use(postCommentsRouter);
 router.use(generateRouter);
 router.use(billingRouter);
 router.use(dashboardRouter);

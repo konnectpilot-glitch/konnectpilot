@@ -25,6 +25,7 @@ import { CalendarDays, Library, DollarSign } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
+import WorkspaceSwitcher from "./workspace-switcher";
 
 type NavChild = { href: string; label: string; icon: any };
 type NavItem = { href: string; label: string; icon: any; children?: NavChild[] };
@@ -197,6 +198,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-bold text-foreground">KonnectPilot</span>
           </div>
           <div className="flex items-center gap-1">
+            <WorkspaceSwitcher />
             <NotificationsBell />
             <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-secondary">
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -205,7 +207,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Desktop top bar */}
-        <header className="hidden md:flex items-center justify-end gap-2 px-6 py-3 border-b border-border bg-card">
+        <header className="hidden md:flex items-center justify-end gap-3 px-6 py-3 border-b border-border bg-card">
+          <WorkspaceSwitcher />
           <NotificationsBell />
         </header>
 

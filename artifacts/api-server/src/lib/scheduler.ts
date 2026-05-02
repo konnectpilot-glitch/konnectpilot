@@ -5,6 +5,7 @@ import {
   brandsTable,
   socialAccountsTable,
   postsTable,
+  workspacesTable,
 } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "./logger";
@@ -100,16 +101,16 @@ async function publishOnePlatform(
  * caption + image when available; only regenerates pieces that are missing.
  * Returns the updated post status.
  */
-export async function retryPost(postId: number, userId: number): Promise<
+export async function retryPost(postId: number, workspaceId: number): Promise<
   | { ok: true; status: "published"; platformPostId: string | null }
   | { ok: false; status: "failed"; error: string }
 > {
-  // Verify ownership via brand
+  // Verify ownership via workspace
   const [row] = await db
     .select({ post: postsTable, brand: brandsTable })
     .from(postsTable)
     .innerJoin(brandsTable, eq(postsTable.brandId, brandsTable.id))
-    .where(and(eq(postsTable.id, postId), eq(brandsTable.userId, userId)));
+    .where(and(eq(postsTable.id, postId), eq(postsTable.workspaceId, workspaceId)));
   if (!row) {
     return { ok: false, status: "failed", error: "Post not found" };
   }
@@ -120,7 +121,7 @@ export async function retryPost(postId: number, userId: number): Promise<
     .from(socialAccountsTable)
     .where(
       and(
-        eq(socialAccountsTable.userId, userId),
+        eq(socialAccountsTable.workspaceId, workspaceId),
         eq(socialAccountsTable.platform, post.platform),
         eq(socialAccountsTable.isActive, true),
       ),
@@ -192,12 +193,14 @@ async function claimSlot(
   brandId: number,
   platform: string,
   slotTime: Date,
+  workspaceId: number | null,
 ): Promise<number | null> {
   try {
     const [row] = await db
       .insert(postsTable)
       .values({
         brandId,
+        workspaceId,
         scheduleId,
         platform,
         content: "",
@@ -218,6 +221,7 @@ async function processClaimedSlot(
   platform: string,
   postRowId: number,
   slotTime: Date,
+  requireApproval: boolean,
 ) {
   logger.info(
     { scheduleId: schedule.id, platform, postRowId, slotTime: slotTime.toISOString() },
@@ -236,12 +240,15 @@ async function processClaimedSlot(
     return;
   }
 
+  const wsId = schedule.workspaceId ?? brand.workspaceId;
   const [account] = await db
     .select()
     .from(socialAccountsTable)
     .where(
       and(
-        eq(socialAccountsTable.userId, schedule.userId),
+        wsId
+          ? eq(socialAccountsTable.workspaceId, wsId)
+          : eq(socialAccountsTable.userId, schedule.userId),
         eq(socialAccountsTable.platform, platform),
         eq(socialAccountsTable.isActive, true),
       ),
@@ -250,6 +257,30 @@ async function processClaimedSlot(
     await db
       .update(postsTable)
       .set({ status: "failed", errorMessage: `No connected ${platform} account.` })
+      .where(eq(postsTable.id, postRowId));
+    return;
+  }
+
+  if (requireApproval) {
+    // Workspace requires admin approval before publishing scheduled posts.
+    // Generate the caption + image so the admin can preview, then park the
+    // row in pending_approval. Admin can approve to publish via the API.
+    const imagePromptOnly = buildImagePrompt(brand, schedule.contentPrompt, schedule.imageStyle);
+    const previewImageUrl = buildImageUrl(imagePromptOnly);
+    let previewCaption = "";
+    try {
+      previewCaption = await generateContent(brand, platform, schedule.contentPrompt);
+    } catch (err: any) {
+      previewCaption = "";
+      logger.warn({ err: err?.message, scheduleId: schedule.id }, "Pending-approval caption gen failed");
+    }
+    await db
+      .update(postsTable)
+      .set({
+        content: previewCaption,
+        imageUrl: previewImageUrl,
+        status: "pending_approval",
+      })
       .where(eq(postsTable.id, postRowId));
     return;
   }
@@ -300,6 +331,20 @@ async function tick() {
       .from(postingSchedulesTable)
       .where(eq(postingSchedulesTable.isActive, true));
 
+    // Cache workspace approval flags per tick to avoid repeat lookups
+    const approvalCache = new Map<number, boolean>();
+    async function workspaceRequiresApproval(wsId: number | null): Promise<boolean> {
+      if (!wsId) return false;
+      if (approvalCache.has(wsId)) return approvalCache.get(wsId)!;
+      const [ws] = await db
+        .select({ requireApproval: workspacesTable.requireApproval })
+        .from(workspacesTable)
+        .where(eq(workspacesTable.id, wsId));
+      const v = ws?.requireApproval ?? false;
+      approvalCache.set(wsId, v);
+      return v;
+    }
+
     for (const schedule of activeSchedules) {
       const seenSlots = new Set<number>();
       for (const time of schedule.postTimes) {
@@ -316,12 +361,14 @@ async function tick() {
         if (seenSlots.has(key)) continue;
         seenSlots.add(key);
 
+        const requireApproval = await workspaceRequiresApproval(schedule.workspaceId);
+
         for (const platform of schedule.platforms) {
-          const claimedId = await claimSlot(schedule.id, schedule.brandId, platform, slotTime);
+          const claimedId = await claimSlot(schedule.id, schedule.brandId, platform, slotTime, schedule.workspaceId);
           if (claimedId === null) continue; // already processed
 
           // Process in background; the row is already claimed so no double-fire risk
-          void processClaimedSlot(schedule, platform, claimedId, slotTime).catch((err) => {
+          void processClaimedSlot(schedule, platform, claimedId, slotTime, requireApproval).catch((err) => {
             logger.error({ err, scheduleId: schedule.id, platform }, "processClaimedSlot threw");
             void db
               .update(postsTable)

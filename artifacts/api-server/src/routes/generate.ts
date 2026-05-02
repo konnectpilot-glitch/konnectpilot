@@ -6,7 +6,7 @@ import {
   GeneratePostResponse,
   SaveGeneratedPostBody,
 } from "@workspace/api-zod";
-import { requireAuth, ensureUser } from "./users";
+import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
@@ -50,8 +50,7 @@ Instructions: ${instruction}
 Write ONLY the post content. No preamble, no explanations, just the post text itself.`;
 }
 
-router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const parsed = GeneratePostBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -61,7 +60,7 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
   const [brand] = await db
     .select()
     .from(brandsTable)
-    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.userId, user.id)));
+    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.workspaceId, req.workspaceId)));
 
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
@@ -97,8 +96,7 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
   }
 });
 
-router.post("/generate/image", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/generate/image", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const { brandId, customPrompt, platform, topic } = req.body;
 
   // Allow pure custom prompt with no brand required
@@ -123,7 +121,7 @@ router.post("/generate/image", requireAuth, async (req: any, res): Promise<void>
     const [brand] = await db
       .select()
       .from(brandsTable)
-      .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
+      .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.workspaceId, req.workspaceId)));
 
     if (!brand) {
       await releaseReservation(imageReservation.reservationId);
@@ -182,8 +180,7 @@ No text overlays. Clean composition with strong visual hierarchy.`;
   }
 });
 
-router.post("/generate/video-script", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/generate/video-script", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const { brandId, topic, platform } = req.body;
 
   if (!brandId) {
@@ -194,7 +191,7 @@ router.post("/generate/video-script", requireAuth, async (req: any, res): Promis
   const [brand] = await db
     .select()
     .from(brandsTable)
-    .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
+    .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.workspaceId, req.workspaceId)));
 
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
@@ -264,8 +261,11 @@ Return ONLY valid JSON. No markdown, no explanation.`;
   res.json({ script });
 });
 
-router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/generate/save", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+    res.status(403).json({ error: "Editor role required" });
+    return;
+  }
   const parsed = SaveGeneratedPostBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -275,7 +275,7 @@ router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> 
   const [brand] = await db
     .select()
     .from(brandsTable)
-    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.userId, user.id)));
+    .where(and(eq(brandsTable.id, parsed.data.brandId), eq(brandsTable.workspaceId, req.workspaceId)));
 
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
@@ -286,6 +286,7 @@ router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> 
     .insert(postsTable)
     .values({
       brandId: parsed.data.brandId,
+      workspaceId: req.workspaceId,
       platform: parsed.data.platform,
       content: parsed.data.content,
       status: parsed.data.status,

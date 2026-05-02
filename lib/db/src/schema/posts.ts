@@ -8,7 +8,11 @@ export const postsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     brandId: integer("brand_id").notNull().references(() => brandsTable.id, { onDelete: "cascade" }),
+    workspaceId: integer("workspace_id"),
     scheduleId: integer("schedule_id"),
+    submittedById: integer("submitted_by_id"),
+    approvedById: integer("approved_by_id"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     platform: text("platform").notNull(),
     content: text("content").notNull(),
     imageUrl: text("image_url"),

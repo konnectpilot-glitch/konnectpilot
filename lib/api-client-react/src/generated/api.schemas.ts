@@ -115,6 +115,9 @@ export const PostStatus = {
   published: "published",
   failed: "failed",
   scheduled: "scheduled",
+  pending_approval: "pending_approval",
+  rejected: "rejected",
+  pending: "pending",
 } as const;
 
 export interface Post {
@@ -165,6 +168,9 @@ export const SavePostBodyStatus = {
   published: "published",
   failed: "failed",
   scheduled: "scheduled",
+  pending_approval: "pending_approval",
+  rejected: "rejected",
+  pending: "pending",
 } as const;
 
 export interface SavePostBody {

@@ -13,4 +13,7 @@ export const PostStatus = {
   published: "published",
   failed: "failed",
   scheduled: "scheduled",
+  pending_approval: "pending_approval",
+  rejected: "rejected",
+  pending: "pending",
 } as const;

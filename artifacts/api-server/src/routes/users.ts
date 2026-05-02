@@ -1,25 +1,115 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
-import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { eq, and, isNull, sql } from "drizzle-orm";
+import {
+  db,
+  usersTable,
+  workspacesTable,
+  workspaceMembersTable,
+  brandsTable,
+  postsTable,
+  postingSchedulesTable,
+  socialAccountsTable,
+} from "@workspace/db";
 import {
   GetMeResponse,
   UpdateMeBody,
   UpdateMeResponse,
 } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-// Ensure user exists in DB (upsert on first request)
+export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
+
+const ROLE_RANK: Record<WorkspaceRole, number> = {
+  viewer: 0,
+  editor: 1,
+  admin: 2,
+  owner: 3,
+};
+
+export function hasRoleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean {
+  return ROLE_RANK[role] >= ROLE_RANK[min];
+}
+
+// Ensure user exists in DB and has a personal workspace + ownership row.
+// Backfills any of their legacy records (brands/posts/schedules/social accounts)
+// that have no workspaceId so existing data continues to work after this migration.
 async function ensureUser(clerkId: string, email: string) {
-  const [existing] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
-  if (existing) return existing;
-  const [created] = await db
-    .insert(usersTable)
-    .values({ clerkId, email, plan: "free" })
-    .returning();
-  return created;
+  let [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  if (!user) {
+    [user] = await db
+      .insert(usersTable)
+      .values({ clerkId, email, plan: "free" })
+      .returning();
+  }
+
+  // Find or create personal workspace
+  let [personal] = await db
+    .select()
+    .from(workspacesTable)
+    .where(and(eq(workspacesTable.ownerId, user.id), eq(workspacesTable.isPersonal, true)));
+  if (!personal) {
+    [personal] = await db
+      .insert(workspacesTable)
+      .values({
+        name: "Personal",
+        ownerId: user.id,
+        isPersonal: true,
+      })
+      .returning();
+  }
+
+  // Ensure owner membership row exists for the personal workspace
+  const [membership] = await db
+    .select()
+    .from(workspaceMembersTable)
+    .where(
+      and(
+        eq(workspaceMembersTable.workspaceId, personal.id),
+        eq(workspaceMembersTable.userId, user.id),
+      ),
+    );
+  if (!membership) {
+    await db.insert(workspaceMembersTable).values({
+      workspaceId: personal.id,
+      userId: user.id,
+      role: "owner",
+    });
+  }
+
+  // Backfill legacy records (one-shot — safe to run repeatedly: only updates rows
+  // where workspaceId is null AND userId matches this user)
+  await db
+    .update(brandsTable)
+    .set({ workspaceId: personal.id })
+    .where(and(eq(brandsTable.userId, user.id), isNull(brandsTable.workspaceId)));
+  await db
+    .update(postingSchedulesTable)
+    .set({ workspaceId: personal.id })
+    .where(and(eq(postingSchedulesTable.userId, user.id), isNull(postingSchedulesTable.workspaceId)));
+  await db
+    .update(socialAccountsTable)
+    .set({ workspaceId: personal.id })
+    .where(and(eq(socialAccountsTable.userId, user.id), isNull(socialAccountsTable.workspaceId)));
+  // Posts inherit workspace from brand
+  await db.execute(sql`
+    UPDATE posts SET workspace_id = b.workspace_id
+    FROM brands b
+    WHERE posts.brand_id = b.id
+      AND posts.workspace_id IS NULL
+      AND b.workspace_id IS NOT NULL
+  `);
+
+  if (!user.activeWorkspaceId) {
+    [user] = await db
+      .update(usersTable)
+      .set({ activeWorkspaceId: personal.id })
+      .where(eq(usersTable.id, user.id))
+      .returning();
+  }
+
+  return user;
 }
 
 export async function requireAuth(req: any, res: any, next: any): Promise<void> {
@@ -62,6 +152,48 @@ export async function requireAuth(req: any, res: any, next: any): Promise<void> 
     }
   }
   next();
+}
+
+/**
+ * Resolves the user's active workspace (from `X-Workspace-Id` header or stored
+ * activeWorkspaceId). Verifies membership. Sets:
+ *   req.user, req.workspace, req.workspaceRole, req.workspaceId
+ */
+export async function requireWorkspace(req: any, res: any, next: any): Promise<void> {
+  try {
+    const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+    const headerId = Number(req.header("x-workspace-id"));
+    let wsId = Number.isFinite(headerId) && headerId > 0 ? headerId : user.activeWorkspaceId;
+    if (!wsId) {
+      res.status(400).json({ error: "No active workspace" });
+      return;
+    }
+    const [row] = await db
+      .select({
+        workspace: workspacesTable,
+        role: workspaceMembersTable.role,
+      })
+      .from(workspacesTable)
+      .innerJoin(
+        workspaceMembersTable,
+        and(
+          eq(workspaceMembersTable.workspaceId, workspacesTable.id),
+          eq(workspaceMembersTable.userId, user.id),
+        ),
+      )
+      .where(eq(workspacesTable.id, wsId));
+    if (!row) {
+      res.status(403).json({ error: "Not a member of that workspace" });
+      return;
+    }
+    req.user = user;
+    req.workspace = row.workspace;
+    req.workspaceId = row.workspace.id;
+    req.workspaceRole = row.role as WorkspaceRole;
+    next();
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Workspace resolution failed" });
+  }
 }
 
 router.get("/users/me", requireAuth, async (req: any, res): Promise<void> => {

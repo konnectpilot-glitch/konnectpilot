@@ -5,6 +5,7 @@ import { brandsTable } from "./brands";
 export const postingSchedulesTable = pgTable("posting_schedules", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  workspaceId: integer("workspace_id"),
   brandId: integer("brand_id").notNull().references(() => brandsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(true),

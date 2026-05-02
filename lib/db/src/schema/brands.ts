@@ -6,6 +6,7 @@ import { usersTable } from "./users";
 export const brandsTable = pgTable("brands", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  workspaceId: integer("workspace_id"),
   name: text("name").notNull(),
   industry: text("industry").notNull(),
   tone: text("tone").notNull().default("friendly"),

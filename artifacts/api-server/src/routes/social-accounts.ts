@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db, socialAccountsTable, usersTable } from "@workspace/db";
-import { requireAuth, ensureUser } from "./users";
+import { requireAuth, requireWorkspace, ensureUser, hasRoleAtLeast } from "./users";
+import { workspacesTable, workspaceMembersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -15,7 +16,7 @@ function signState(payload: object): string {
   return `${body}.${sig}`;
 }
 
-function verifyState(state: string): { platform: string; clerkUserId: string } | null {
+function verifyState(state: string): { platform: string; clerkUserId: string; workspaceId?: number } | null {
   const parts = state.split(".");
   if (parts.length !== 2) return null;
   const [body, sig] = parts;
@@ -224,7 +225,11 @@ function getRedirectUri(req: any, platform: string): string {
   return `${getAppUrl(req)}/api/social-accounts/callback/${platform}`;
 }
 
-router.post("/social-accounts/connect", requireAuth, async (req: any, res): Promise<void> => {
+router.post("/social-accounts/connect", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+    res.status(403).json({ error: "Admin role required" });
+    return;
+  }
   const { platform } = req.body ?? {};
   const config = PLATFORMS[platform as string];
   if (!config) {
@@ -236,7 +241,7 @@ router.post("/social-accounts/connect", requireAuth, async (req: any, res): Prom
     res.status(503).json({ error: "not_configured", missing });
     return;
   }
-  const state = signState({ platform, clerkUserId: req.clerkUserId, ts: Date.now() });
+  const state = signState({ platform, clerkUserId: req.clerkUserId, workspaceId: req.workspaceId, ts: Date.now() });
   const redirectUri = getRedirectUri(req, platform);
   res.json({ url: config.authUrl(redirectUri, state) });
 });
@@ -281,17 +286,34 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
       return;
     }
 
+    // Resolve target workspace (state-bound, fall back to user's active personal)
+    let targetWsId = decoded.workspaceId ?? user.activeWorkspaceId ?? null;
+    if (targetWsId) {
+      const [member] = await db
+        .select()
+        .from(workspaceMembersTable)
+        .where(
+          and(
+            eq(workspaceMembersTable.workspaceId, targetWsId),
+            eq(workspaceMembersTable.userId, user.id),
+          ),
+        );
+      if (!member) targetWsId = user.activeWorkspaceId ?? null;
+    }
+
     const redirectUri = getRedirectUri(req, platform);
     const tokens = await config.exchangeToken(code, redirectUri);
     const profile = await config.fetchProfile(tokens.accessToken);
 
-    // Upsert by (userId, platform, platformUserId)
+    // Upsert by (workspaceId, platform, platformUserId) — falls back to user-scoped match
     const [existing] = await db
       .select()
       .from(socialAccountsTable)
       .where(
         and(
-          eq(socialAccountsTable.userId, user.id),
+          targetWsId
+            ? eq(socialAccountsTable.workspaceId, targetWsId)
+            : eq(socialAccountsTable.userId, user.id),
           eq(socialAccountsTable.platform, platform),
           eq(socialAccountsTable.platformUserId, profile.platformUserId),
         ),
@@ -313,6 +335,7 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
     } else {
       await db.insert(socialAccountsTable).values({
         userId: user.id,
+        workspaceId: targetWsId,
         platform,
         platformUserId: profile.platformUserId,
         accountName: profile.accountName,
@@ -332,8 +355,11 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
   }
 });
 
-router.post("/social-accounts/manual-connect", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.post("/social-accounts/manual-connect", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+    res.status(403).json({ error: "Admin role required" });
+    return;
+  }
   const { platform, accountName, accountHandle } = req.body ?? {};
 
   if (!platform || typeof platform !== "string" || !PLATFORMS[platform]) {
@@ -351,7 +377,8 @@ router.post("/social-accounts/manual-connect", requireAuth, async (req: any, res
   const [account] = await db
     .insert(socialAccountsTable)
     .values({
-      userId: user.id,
+      userId: req.user.id,
+      workspaceId: req.workspaceId,
       platform,
       platformUserId: `manual-${platform}-${Date.now()}`,
       accountName: trimmedName,
@@ -372,8 +399,7 @@ router.post("/social-accounts/manual-connect", requireAuth, async (req: any, res
   });
 });
 
-router.get("/social-accounts", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/social-accounts", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const accounts = await db
     .select({
       id: socialAccountsTable.id,
@@ -385,7 +411,7 @@ router.get("/social-accounts", requireAuth, async (req: any, res): Promise<void>
       createdAt: socialAccountsTable.createdAt,
     })
     .from(socialAccountsTable)
-    .where(eq(socialAccountsTable.userId, user.id))
+    .where(eq(socialAccountsTable.workspaceId, req.workspaceId))
     .orderBy(socialAccountsTable.createdAt);
 
   res.json(accounts.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() })));
@@ -394,14 +420,13 @@ router.get("/social-accounts", requireAuth, async (req: any, res): Promise<void>
 // Returns the Facebook Pages the connected account admins. Used by the UI to
 // warn users who connected a personal Facebook profile but don't admin any
 // Pages — Meta's Graph API only allows posting to Pages, not personal feeds.
-router.get("/social-accounts/facebook/pages", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.get("/social-accounts/facebook/pages", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const [account] = await db
     .select()
     .from(socialAccountsTable)
     .where(
       and(
-        eq(socialAccountsTable.userId, user.id),
+        eq(socialAccountsTable.workspaceId, req.workspaceId),
         eq(socialAccountsTable.platform, "facebook"),
         eq(socialAccountsTable.isActive, true),
       ),
@@ -431,8 +456,11 @@ router.get("/social-accounts/facebook/pages", requireAuth, async (req: any, res)
   }
 });
 
-router.delete("/social-accounts/:id", requireAuth, async (req: any, res): Promise<void> => {
-  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+router.delete("/social-accounts/:id", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+    res.status(403).json({ error: "Admin role required" });
+    return;
+  }
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -441,7 +469,7 @@ router.delete("/social-accounts/:id", requireAuth, async (req: any, res): Promis
 
   const [deleted] = await db
     .delete(socialAccountsTable)
-    .where(and(eq(socialAccountsTable.id, id), eq(socialAccountsTable.userId, user.id)))
+    .where(and(eq(socialAccountsTable.id, id), eq(socialAccountsTable.workspaceId, req.workspaceId)))
     .returning();
 
   if (!deleted) {
