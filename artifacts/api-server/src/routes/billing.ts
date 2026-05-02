@@ -1,7 +1,16 @@
 import { Router, type IRouter } from "express";
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import {
+  db,
+  usersTable,
+  affiliateReferralsTable,
+  affiliateCommissionsTable,
+} from "@workspace/db";
+import {
+  commissionPeriodFor,
+  computeCommissionCents,
+} from "../lib/affiliate";
 import {
   ListPlansResponse,
   CreateCheckoutSessionBody,
@@ -178,7 +187,81 @@ router.post("/billing/webhooks", async (req: any, res): Promise<void> => {
           stripeSubscriptionId: session.subscription as string,
           subscriptionStatus: "active",
         }).where(eq(usersTable.id, userId));
+
+        // Mark affiliate referral as converted on first paid checkout.
+        const [ref] = await db
+          .select()
+          .from(affiliateReferralsTable)
+          .where(eq(affiliateReferralsTable.referredUserId, userId));
+        if (ref && !ref.convertedAt) {
+          await db
+            .update(affiliateReferralsTable)
+            .set({ convertedAt: new Date(), status: "converted" })
+            .where(eq(affiliateReferralsTable.id, ref.id));
+        }
       }
+      break;
+    }
+    case "invoice.payment_succeeded": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = invoice.customer as string | null;
+      if (!customerId) break;
+      const [user] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.stripeCustomerId, customerId));
+      if (!user) break;
+      const [ref] = await db
+        .select()
+        .from(affiliateReferralsTable)
+        .where(eq(affiliateReferralsTable.referredUserId, user.id));
+      if (!ref || !ref.convertedAt) break;
+
+      const invoiceDate = new Date((invoice.created ?? 0) * 1000);
+      const periodIndex = commissionPeriodFor(ref.convertedAt, invoiceDate);
+      if (periodIndex === null) break;
+
+      const amountPaid = invoice.amount_paid ?? 0;
+      if (amountPaid <= 0) break;
+      const commissionCents = computeCommissionCents(amountPaid);
+      try {
+        await db.insert(affiliateCommissionsTable).values({
+          affiliateId: ref.affiliateId,
+          referralId: ref.id,
+          stripeInvoiceId: invoice.id ?? null,
+          amountCents: commissionCents,
+          currency: invoice.currency ?? "usd",
+          periodIndex,
+          status: "pending",
+        });
+        req.log.info(
+          {
+            affiliateId: ref.affiliateId,
+            referralId: ref.id,
+            invoiceId: invoice.id,
+            commissionCents,
+            periodIndex,
+          },
+          "Affiliate commission recorded",
+        );
+      } catch (err: any) {
+        // Unique index on stripeInvoiceId — duplicate webhook delivery
+        req.log.info(
+          { invoiceId: invoice.id, err: err?.message },
+          "Skipped duplicate affiliate commission",
+        );
+      }
+      break;
+    }
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      const invoiceId =
+        typeof charge.invoice === "string" ? charge.invoice : charge.invoice?.id;
+      if (!invoiceId) break;
+      await db
+        .update(affiliateCommissionsTable)
+        .set({ status: "reversed" })
+        .where(eq(affiliateCommissionsTable.stripeInvoiceId, invoiceId));
       break;
     }
     case "customer.subscription.updated": {

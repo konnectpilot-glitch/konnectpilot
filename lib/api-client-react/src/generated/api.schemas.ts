@@ -274,6 +274,86 @@ export interface ImpersonationSession {
   plan: string;
 }
 
+export interface TrackClickBody {
+  code: string;
+  visitorId?: string;
+}
+
+export interface AttributeSignupBody {
+  code: string;
+}
+
+export type UpdatePayoutBodyPayoutMethod =
+  (typeof UpdatePayoutBodyPayoutMethod)[keyof typeof UpdatePayoutBodyPayoutMethod];
+
+export const UpdatePayoutBodyPayoutMethod = {
+  paypal: "paypal",
+  stripe_connect: "stripe_connect",
+} as const;
+
+export interface UpdatePayoutBody {
+  payoutMethod: UpdatePayoutBodyPayoutMethod;
+  /** @nullable */
+  paypalEmail?: string | null;
+  /** @nullable */
+  stripeConnectAccountId?: string | null;
+}
+
+export interface AffiliateConfig {
+  ratePct: number;
+  months: number;
+  minPayoutCents: number;
+  cookieDays: number;
+}
+
+export interface AffiliateStats {
+  clicks: number;
+  signups: number;
+  conversions: number;
+  pendingCents: number;
+  paidCents: number;
+  lifetimeEarnedCents: number;
+}
+
+export interface AffiliateReferralRow {
+  id: number;
+  code: string;
+  status: string;
+  clickAt: string;
+  /** @nullable */
+  signupAt?: string | null;
+  /** @nullable */
+  convertedAt?: string | null;
+}
+
+export interface AffiliateProfile {
+  code: string;
+  /** @nullable */
+  payoutMethod?: string | null;
+  /** @nullable */
+  paypalEmail?: string | null;
+  /** @nullable */
+  stripeConnectAccountId?: string | null;
+  config: AffiliateConfig;
+  stats: AffiliateStats;
+  recentReferrals: AffiliateReferralRow[];
+}
+
+export interface AdminAffiliateSummary {
+  id: number;
+  userId: number;
+  code: string;
+  /** @nullable */
+  payoutMethod?: string | null;
+  /** @nullable */
+  paypalEmail?: string | null;
+  /** @nullable */
+  stripeConnectAccountId?: string | null;
+  pendingCents: number;
+  paidCents: number;
+  lifetimePaidCents: number;
+}
+
 export type ListPostsParams = {
   /**
    * @nullable
@@ -295,4 +375,23 @@ export type ListPostsParams = {
    * @nullable
    */
   offset?: number | null;
+};
+
+export type TrackAffiliateClick200 = {
+  ok: boolean;
+};
+
+export type AttributeAffiliateSignup200 = {
+  ok: boolean;
+  alreadyAttributed?: boolean;
+};
+
+export type UpdateAffiliatePayout200 = {
+  ok: boolean;
+};
+
+export type AdminPayAffiliate200 = {
+  ok: boolean;
+  paidCents: number;
+  commissionCount: number;
 };

@@ -405,6 +405,108 @@ export const AdminSetSuperadminResponse = zod.object({
 });
 
 /**
+ * @summary Get the current user's affiliate profile, stats, and balances
+ */
+export const GetAffiliateMeResponse = zod.object({
+  code: zod.string(),
+  payoutMethod: zod.string().nullish(),
+  paypalEmail: zod.string().nullish(),
+  stripeConnectAccountId: zod.string().nullish(),
+  config: zod.object({
+    ratePct: zod.number(),
+    months: zod.number(),
+    minPayoutCents: zod.number(),
+    cookieDays: zod.number(),
+  }),
+  stats: zod.object({
+    clicks: zod.number(),
+    signups: zod.number(),
+    conversions: zod.number(),
+    pendingCents: zod.number(),
+    paidCents: zod.number(),
+    lifetimeEarnedCents: zod.number(),
+  }),
+  recentReferrals: zod.array(
+    zod.object({
+      id: zod.number(),
+      code: zod.string(),
+      status: zod.string(),
+      clickAt: zod.string(),
+      signupAt: zod.string().nullish(),
+      convertedAt: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Record a referral link click (public)
+ */
+export const TrackAffiliateClickBody = zod.object({
+  code: zod.string(),
+  visitorId: zod.string().optional(),
+});
+
+export const TrackAffiliateClickResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Attribute the current authenticated user to a referral code
+ */
+export const AttributeAffiliateSignupBody = zod.object({
+  code: zod.string(),
+});
+
+export const AttributeAffiliateSignupResponse = zod.object({
+  ok: zod.boolean(),
+  alreadyAttributed: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update payout method and details for the current affiliate
+ */
+export const UpdateAffiliatePayoutBody = zod.object({
+  payoutMethod: zod.enum(["paypal", "stripe_connect"]),
+  paypalEmail: zod.string().nullish(),
+  stripeConnectAccountId: zod.string().nullish(),
+});
+
+export const UpdateAffiliatePayoutResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary List all affiliates with their pending/paid balances
+ */
+export const AdminListAffiliatesResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  code: zod.string(),
+  payoutMethod: zod.string().nullish(),
+  paypalEmail: zod.string().nullish(),
+  stripeConnectAccountId: zod.string().nullish(),
+  pendingCents: zod.number(),
+  paidCents: zod.number(),
+  lifetimePaidCents: zod.number(),
+});
+export const AdminListAffiliatesResponse = zod.array(
+  AdminListAffiliatesResponseItem,
+);
+
+/**
+ * @summary Mark all pending commissions for an affiliate as paid
+ */
+export const AdminPayAffiliateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminPayAffiliateResponse = zod.object({
+  ok: zod.boolean(),
+  paidCents: zod.number(),
+  commissionCount: zod.number(),
+});
+
+/**
  * @summary Get post counts by platform
  */
 export const GetPlatformBreakdownResponseItem = zod.object({

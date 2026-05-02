@@ -26,6 +26,8 @@ tags:
     description: AI usage and quotas
   - name: admin
     description: Super-admin operations
+  - name: affiliate
+    description: Affiliate program tracking and payouts
 
 paths:
   /healthz:
@@ -638,6 +640,148 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /affiliate/me:
+    get:
+      operationId: getAffiliateMe
+      tags: [affiliate]
+      summary: Get the current user's affiliate profile, stats, and balances
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Affiliate profile and stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateProfile"
+
+  /affiliate/track-click:
+    post:
+      operationId: trackAffiliateClick
+      tags: [affiliate]
+      summary: Record a referral link click (public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrackClickBody"
+      responses:
+        "200":
+          description: Click recorded (or ignored if code unknown)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  /affiliate/attribute-signup:
+    post:
+      operationId: attributeAffiliateSignup
+      tags: [affiliate]
+      summary: Attribute the current authenticated user to a referral code
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttributeSignupBody"
+      responses:
+        "200":
+          description: Attribution result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  alreadyAttributed:
+                    type: boolean
+                required: [ok]
+        "404":
+          description: Unknown code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /affiliate/me/payout:
+    patch:
+      operationId: updateAffiliatePayout
+      tags: [affiliate]
+      summary: Update payout method and details for the current affiliate
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePayoutBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  /admin/affiliates:
+    get:
+      operationId: adminListAffiliates
+      tags: [admin]
+      summary: List all affiliates with their pending/paid balances
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Affiliate list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAffiliateSummary"
+
+  /admin/affiliates/{id}/pay:
+    post:
+      operationId: adminPayAffiliate
+      tags: [admin]
+      summary: Mark all pending commissions for an affiliate as paid
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payout summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  paidCents:
+                    type: integer
+                  commissionCount:
+                    type: integer
+                required: [ok, paidCents, commissionCount]
+
   /dashboard/platform-breakdown:
     get:
       operationId: getPlatformBreakdown
@@ -1088,3 +1232,149 @@ components:
         - clerkId
         - email
         - plan
+
+    TrackClickBody:
+      type: object
+      properties:
+        code:
+          type: string
+        visitorId:
+          type: string
+      required:
+        - code
+
+    AttributeSignupBody:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+
+    UpdatePayoutBody:
+      type: object
+      properties:
+        payoutMethod:
+          type: string
+          enum: [paypal, stripe_connect]
+        paypalEmail:
+          type: ["string", "null"]
+        stripeConnectAccountId:
+          type: ["string", "null"]
+      required:
+        - payoutMethod
+
+    AffiliateConfig:
+      type: object
+      properties:
+        ratePct:
+          type: integer
+        months:
+          type: integer
+        minPayoutCents:
+          type: integer
+        cookieDays:
+          type: integer
+      required:
+        - ratePct
+        - months
+        - minPayoutCents
+        - cookieDays
+
+    AffiliateStats:
+      type: object
+      properties:
+        clicks:
+          type: integer
+        signups:
+          type: integer
+        conversions:
+          type: integer
+        pendingCents:
+          type: integer
+        paidCents:
+          type: integer
+        lifetimeEarnedCents:
+          type: integer
+      required:
+        - clicks
+        - signups
+        - conversions
+        - pendingCents
+        - paidCents
+        - lifetimeEarnedCents
+
+    AffiliateReferralRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        status:
+          type: string
+        clickAt:
+          type: string
+        signupAt:
+          type: ["string", "null"]
+        convertedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - code
+        - status
+        - clickAt
+
+    AffiliateProfile:
+      type: object
+      properties:
+        code:
+          type: string
+        payoutMethod:
+          type: ["string", "null"]
+        paypalEmail:
+          type: ["string", "null"]
+        stripeConnectAccountId:
+          type: ["string", "null"]
+        config:
+          $ref: "#/components/schemas/AffiliateConfig"
+        stats:
+          $ref: "#/components/schemas/AffiliateStats"
+        recentReferrals:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateReferralRow"
+      required:
+        - code
+        - config
+        - stats
+        - recentReferrals
+
+    AdminAffiliateSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        code:
+          type: string
+        payoutMethod:
+          type: ["string", "null"]
+        paypalEmail:
+          type: ["string", "null"]
+        stripeConnectAccountId:
+          type: ["string", "null"]
+        pendingCents:
+          type: integer
+        paidCents:
+          type: integer
+        lifetimePaidCents:
+          type: integer
+      required:
+        - id
+        - userId
+        - code
+        - pendingCents
+        - paidCents
+        - lifetimePaidCents

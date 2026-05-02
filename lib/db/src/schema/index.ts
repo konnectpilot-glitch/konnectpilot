@@ -4,3 +4,4 @@ export * from "./posts";
 export * from "./social-accounts";
 export * from "./schedules";
 export * from "./ai-usage";
+export * from "./affiliates";

@@ -6,10 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./adminAffiliateSummary";
+export * from "./adminPayAffiliate200";
 export * from "./adminSetPlanBody";
 export * from "./adminSetPlanBodyPlan";
 export * from "./adminSetSuperadminBody";
 export * from "./adminUserSummary";
+export * from "./affiliateConfig";
+export * from "./affiliateProfile";
+export * from "./affiliateReferralRow";
+export * from "./affiliateStats";
+export * from "./attributeAffiliateSignup200";
+export * from "./attributeSignupBody";
 export * from "./brand";
 export * from "./brandTone";
 export * from "./checkoutSession";
@@ -31,7 +39,12 @@ export * from "./post";
 export * from "./postStatus";
 export * from "./savePostBody";
 export * from "./savePostBodyStatus";
+export * from "./trackAffiliateClick200";
+export * from "./trackClickBody";
+export * from "./updateAffiliatePayout200";
 export * from "./updateBrandBody";
+export * from "./updatePayoutBody";
+export * from "./updatePayoutBodyPayoutMethod";
 export * from "./updateUserBody";
 export * from "./usageStats";
 export * from "./user";

@@ -17,9 +17,14 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AdminAffiliateSummary,
+  AdminPayAffiliate200,
   AdminSetPlanBody,
   AdminSetSuperadminBody,
   AdminUserSummary,
+  AffiliateProfile,
+  AttributeAffiliateSignup200,
+  AttributeSignupBody,
   Brand,
   CheckoutSession,
   CreateBrandBody,
@@ -36,7 +41,11 @@ import type {
   PortalSession,
   Post,
   SavePostBody,
+  TrackAffiliateClick200,
+  TrackClickBody,
+  UpdateAffiliatePayout200,
   UpdateBrandBody,
+  UpdatePayoutBody,
   UpdateUserBody,
   UsageStats,
   User,
@@ -1994,6 +2003,502 @@ export const useAdminSetSuperadmin = <
   TContext
 > => {
   return useMutation(getAdminSetSuperadminMutationOptions(options));
+};
+
+/**
+ * @summary Get the current user's affiliate profile, stats, and balances
+ */
+export const getGetAffiliateMeUrl = () => {
+  return `/api/affiliate/me`;
+};
+
+export const getAffiliateMe = async (
+  options?: RequestInit,
+): Promise<AffiliateProfile> => {
+  return customFetch<AffiliateProfile>(getGetAffiliateMeUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAffiliateMeQueryKey = () => {
+  return [`/api/affiliate/me`] as const;
+};
+
+export const getGetAffiliateMeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAffiliateMe>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAffiliateMe>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAffiliateMeQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAffiliateMe>>> = ({
+    signal,
+  }) => getAffiliateMe({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAffiliateMe>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAffiliateMeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAffiliateMe>>
+>;
+export type GetAffiliateMeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current user's affiliate profile, stats, and balances
+ */
+
+export function useGetAffiliateMe<
+  TData = Awaited<ReturnType<typeof getAffiliateMe>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAffiliateMe>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAffiliateMeQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Record a referral link click (public)
+ */
+export const getTrackAffiliateClickUrl = () => {
+  return `/api/affiliate/track-click`;
+};
+
+export const trackAffiliateClick = async (
+  trackClickBody: TrackClickBody,
+  options?: RequestInit,
+): Promise<TrackAffiliateClick200> => {
+  return customFetch<TrackAffiliateClick200>(getTrackAffiliateClickUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(trackClickBody),
+  });
+};
+
+export const getTrackAffiliateClickMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof trackAffiliateClick>>,
+    TError,
+    { data: BodyType<TrackClickBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof trackAffiliateClick>>,
+  TError,
+  { data: BodyType<TrackClickBody> },
+  TContext
+> => {
+  const mutationKey = ["trackAffiliateClick"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof trackAffiliateClick>>,
+    { data: BodyType<TrackClickBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return trackAffiliateClick(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TrackAffiliateClickMutationResult = NonNullable<
+  Awaited<ReturnType<typeof trackAffiliateClick>>
+>;
+export type TrackAffiliateClickMutationBody = BodyType<TrackClickBody>;
+export type TrackAffiliateClickMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a referral link click (public)
+ */
+export const useTrackAffiliateClick = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof trackAffiliateClick>>,
+    TError,
+    { data: BodyType<TrackClickBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof trackAffiliateClick>>,
+  TError,
+  { data: BodyType<TrackClickBody> },
+  TContext
+> => {
+  return useMutation(getTrackAffiliateClickMutationOptions(options));
+};
+
+/**
+ * @summary Attribute the current authenticated user to a referral code
+ */
+export const getAttributeAffiliateSignupUrl = () => {
+  return `/api/affiliate/attribute-signup`;
+};
+
+export const attributeAffiliateSignup = async (
+  attributeSignupBody: AttributeSignupBody,
+  options?: RequestInit,
+): Promise<AttributeAffiliateSignup200> => {
+  return customFetch<AttributeAffiliateSignup200>(
+    getAttributeAffiliateSignupUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(attributeSignupBody),
+    },
+  );
+};
+
+export const getAttributeAffiliateSignupMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attributeAffiliateSignup>>,
+    TError,
+    { data: BodyType<AttributeSignupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attributeAffiliateSignup>>,
+  TError,
+  { data: BodyType<AttributeSignupBody> },
+  TContext
+> => {
+  const mutationKey = ["attributeAffiliateSignup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attributeAffiliateSignup>>,
+    { data: BodyType<AttributeSignupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return attributeAffiliateSignup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttributeAffiliateSignupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attributeAffiliateSignup>>
+>;
+export type AttributeAffiliateSignupMutationBody =
+  BodyType<AttributeSignupBody>;
+export type AttributeAffiliateSignupMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Attribute the current authenticated user to a referral code
+ */
+export const useAttributeAffiliateSignup = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attributeAffiliateSignup>>,
+    TError,
+    { data: BodyType<AttributeSignupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof attributeAffiliateSignup>>,
+  TError,
+  { data: BodyType<AttributeSignupBody> },
+  TContext
+> => {
+  return useMutation(getAttributeAffiliateSignupMutationOptions(options));
+};
+
+/**
+ * @summary Update payout method and details for the current affiliate
+ */
+export const getUpdateAffiliatePayoutUrl = () => {
+  return `/api/affiliate/me/payout`;
+};
+
+export const updateAffiliatePayout = async (
+  updatePayoutBody: UpdatePayoutBody,
+  options?: RequestInit,
+): Promise<UpdateAffiliatePayout200> => {
+  return customFetch<UpdateAffiliatePayout200>(getUpdateAffiliatePayoutUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updatePayoutBody),
+  });
+};
+
+export const getUpdateAffiliatePayoutMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAffiliatePayout>>,
+    TError,
+    { data: BodyType<UpdatePayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAffiliatePayout>>,
+  TError,
+  { data: BodyType<UpdatePayoutBody> },
+  TContext
+> => {
+  const mutationKey = ["updateAffiliatePayout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAffiliatePayout>>,
+    { data: BodyType<UpdatePayoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAffiliatePayout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAffiliatePayoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAffiliatePayout>>
+>;
+export type UpdateAffiliatePayoutMutationBody = BodyType<UpdatePayoutBody>;
+export type UpdateAffiliatePayoutMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update payout method and details for the current affiliate
+ */
+export const useUpdateAffiliatePayout = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAffiliatePayout>>,
+    TError,
+    { data: BodyType<UpdatePayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAffiliatePayout>>,
+  TError,
+  { data: BodyType<UpdatePayoutBody> },
+  TContext
+> => {
+  return useMutation(getUpdateAffiliatePayoutMutationOptions(options));
+};
+
+/**
+ * @summary List all affiliates with their pending/paid balances
+ */
+export const getAdminListAffiliatesUrl = () => {
+  return `/api/admin/affiliates`;
+};
+
+export const adminListAffiliates = async (
+  options?: RequestInit,
+): Promise<AdminAffiliateSummary[]> => {
+  return customFetch<AdminAffiliateSummary[]>(getAdminListAffiliatesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminListAffiliatesQueryKey = () => {
+  return [`/api/admin/affiliates`] as const;
+};
+
+export const getAdminListAffiliatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminListAffiliates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof adminListAffiliates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminListAffiliatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminListAffiliates>>
+  > = ({ signal }) => adminListAffiliates({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminListAffiliates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminListAffiliatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminListAffiliates>>
+>;
+export type AdminListAffiliatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all affiliates with their pending/paid balances
+ */
+
+export function useAdminListAffiliates<
+  TData = Awaited<ReturnType<typeof adminListAffiliates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof adminListAffiliates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminListAffiliatesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Mark all pending commissions for an affiliate as paid
+ */
+export const getAdminPayAffiliateUrl = (id: number) => {
+  return `/api/admin/affiliates/${id}/pay`;
+};
+
+export const adminPayAffiliate = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AdminPayAffiliate200> => {
+  return customFetch<AdminPayAffiliate200>(getAdminPayAffiliateUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAdminPayAffiliateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminPayAffiliate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminPayAffiliate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["adminPayAffiliate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminPayAffiliate>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return adminPayAffiliate(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminPayAffiliateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminPayAffiliate>>
+>;
+
+export type AdminPayAffiliateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark all pending commissions for an affiliate as paid
+ */
+export const useAdminPayAffiliate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminPayAffiliate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminPayAffiliate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAdminPayAffiliateMutationOptions(options));
 };
 
 /**

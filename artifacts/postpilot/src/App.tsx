@@ -127,6 +127,42 @@ function ApiClientAuthBridge() {
   return null;
 }
 
+function AffiliateAttributionBridge() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      const { getStoredReferralCode, hasAttributed, markAttributed } = await import(
+        "./lib/affiliate-tracking"
+      );
+      if (hasAttributed()) return;
+      const code = getStoredReferralCode();
+      if (!code) return;
+      try {
+        const token = await getToken();
+        const res = await fetch(`${basePath}/api/affiliate/attribute-signup`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ code }),
+        });
+        if (!cancelled && res.ok) markAttributed();
+      } catch {
+        // ignore — attribution is best effort and will retry on next load
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, getToken]);
+
+  return null;
+}
+
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
@@ -201,6 +237,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ApiClientAuthBridge />
+        <AffiliateAttributionBridge />
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/" component={HomeRedirect} />
