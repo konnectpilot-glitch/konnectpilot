@@ -361,6 +361,21 @@ export const AdminSetPlanResponse = zod.object({
 });
 
 /**
+ * @summary Begin an impersonation session for the given user
+ */
+export const AdminImpersonateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminImpersonateResponse = zod.object({
+  userId: zod.number(),
+  clerkId: zod.string(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  plan: zod.string(),
+});
+
+/**
  * @summary Toggle superadmin flag on a user
  */
 export const AdminSetSuperadminParams = zod.object({

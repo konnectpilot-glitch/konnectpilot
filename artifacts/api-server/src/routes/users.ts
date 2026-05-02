@@ -30,7 +30,37 @@ export async function requireAuth(req: any, res: any, next: any): Promise<void> 
     return;
   }
   req.clerkUserId = userId;
-  req.clerkEmail = auth.sessionClaims?.email as string || "";
+  req.clerkEmail = (auth.sessionClaims?.email as string) || "";
+
+  // Impersonation: a superadmin can pass X-Impersonate-User-Id to act as
+  // another user for the duration of the request. We validate the requester
+  // is a superadmin server-side and swap the effective Clerk identity to the
+  // target user's. The original admin id is preserved on req.actualAdminId
+  // for audit logging.
+  const impersonateRaw = req.header("X-Impersonate-User-Id");
+  if (impersonateRaw) {
+    const targetId = parseInt(String(impersonateRaw), 10);
+    if (!Number.isNaN(targetId)) {
+      const requester = await ensureUser(req.clerkUserId, req.clerkEmail);
+      if (requester.isSuperadmin) {
+        const [target] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, targetId));
+        if (target && target.id !== requester.id) {
+          req.actualAdminId = requester.id;
+          req.actualAdminEmail = requester.email;
+          req.clerkUserId = target.clerkId;
+          req.clerkEmail = target.email;
+          req.isImpersonating = true;
+          logger.info(
+            { adminId: requester.id, targetUserId: target.id, path: req.path },
+            "Admin impersonating user",
+          );
+        }
+      }
+    }
+  }
   next();
 }
 

@@ -5,14 +5,16 @@ import {
   useAdminResetTrial,
   useAdminSetPlan,
   useAdminSetSuperadmin,
+  useAdminImpersonate,
   useGetMe,
   getAdminListUsersQueryKey,
 } from "@workspace/api-client-react";
+import { startImpersonation } from "@/lib/impersonation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AdminUserSummary } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Redirect } from "wouter";
-import { Loader2, Search, Shield, RotateCcw, Crown, ChevronDown } from "lucide-react";
+import { Loader2, Search, Shield, RotateCcw, Crown, ChevronDown, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   DropdownMenu,
@@ -68,6 +70,21 @@ export default function AdminPage() {
   const resetTrial = useAdminResetTrial();
   const setPlan = useAdminSetPlan();
   const setSuperadmin = useAdminSetSuperadmin();
+  const impersonate = useAdminImpersonate();
+
+  const handleImpersonate = (u: AdminUserSummary) => {
+    impersonate.mutate(
+      { id: u.id },
+      {
+        onSuccess: (session) => {
+          startImpersonation(session.userId, session.email);
+          toast.success(`Now viewing as ${session.email}`);
+          queryClient.invalidateQueries();
+        },
+        onError: (err: any) => toast.error(err?.message ?? "Failed to impersonate"),
+      },
+    );
+  };
 
   const filtered = useMemo(() => {
     if (!users) return [];
@@ -264,6 +281,14 @@ export default function AdminPage() {
                               </DropdownMenuItem>
                             ))}
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleImpersonate(u)}
+                              className="text-sm"
+                              disabled={u.id === me?.id}
+                            >
+                              <Eye className="w-3.5 h-3.5 mr-2" />
+                              Impersonate user
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResetTrial(u)} className="text-sm">
                               <RotateCcw className="w-3.5 h-3.5 mr-2" />
                               Reset 14-day trial

@@ -578,6 +578,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/users/{id}/impersonate:
+    post:
+      operationId: adminImpersonate
+      tags: [admin]
+      summary: Begin an impersonation session for the given user
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Impersonation session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpersonationSession"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/users/{id}/superadmin:
     patch:
       operationId: adminSetSuperadmin
@@ -1042,3 +1069,22 @@ components:
           type: boolean
       required:
         - isSuperadmin
+
+    ImpersonationSession:
+      type: object
+      properties:
+        userId:
+          type: integer
+        clerkId:
+          type: string
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        plan:
+          type: string
+      required:
+        - userId
+        - clerkId
+        - email
+        - plan

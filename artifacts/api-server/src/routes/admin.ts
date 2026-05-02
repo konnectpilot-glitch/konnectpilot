@@ -207,6 +207,39 @@ router.patch(
   },
 );
 
+router.post(
+  "/admin/users/:id/impersonate",
+  requireAuth,
+  requireSuperadmin,
+  async (req: any, res): Promise<void> => {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    if (id === req.adminUser.id) {
+      res.status(400).json({ error: "Cannot impersonate yourself" });
+      return;
+    }
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    logger.info(
+      { adminId: req.adminUser.id, targetUserId: target.id, targetEmail: target.email },
+      "Impersonation session started",
+    );
+    res.json({
+      userId: target.id,
+      clerkId: target.clerkId,
+      email: target.email,
+      name: target.name,
+      plan: target.plan,
+    });
+  },
+);
+
 router.patch(
   "/admin/users/:id/superadmin",
   requireAuth,

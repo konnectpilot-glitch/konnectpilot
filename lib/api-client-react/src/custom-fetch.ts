@@ -44,6 +44,17 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+let _impersonationHeaderGetter: (() => string | null) | null = null;
+
+/**
+ * Register a getter that returns the user id to impersonate. When set, every
+ * outgoing request will include `X-Impersonate-User-Id`. The server validates
+ * the requester is a superadmin before honoring it.
+ */
+export function setImpersonationGetter(getter: (() => string | null) | null): void {
+  _impersonationHeaderGetter = getter;
+}
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }
@@ -355,6 +366,13 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  if (_impersonationHeaderGetter && !headers.has("x-impersonate-user-id")) {
+    const impersonateId = _impersonationHeaderGetter();
+    if (impersonateId) {
+      headers.set("x-impersonate-user-id", impersonateId);
     }
   }
 

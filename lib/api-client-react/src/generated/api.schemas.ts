@@ -265,6 +265,15 @@ export interface AdminSetSuperadminBody {
   isSuperadmin: boolean;
 }
 
+export interface ImpersonationSession {
+  userId: number;
+  clerkId: string;
+  email: string;
+  /** @nullable */
+  name?: string | null;
+  plan: string;
+}
+
 export type ListPostsParams = {
   /**
    * @nullable

@@ -22,6 +22,7 @@ export * from "./generatedPost";
 export * from "./generatePostBody";
 export * from "./generatePostBodyPlatform";
 export * from "./healthStatus";
+export * from "./impersonationSession";
 export * from "./listPostsParams";
 export * from "./plan";
 export * from "./platformStat";

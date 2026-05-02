@@ -24,6 +24,7 @@ import { useClerk } from "@clerk/react";
 import { CalendarDays, Library, DollarSign } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
+import ImpersonationBanner from "./impersonation-banner";
 
 type NavChild = { href: string; label: string; icon: any };
 type NavItem = { href: string; label: string; icon: any; children?: NavChild[] };
@@ -167,7 +168,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
+      <ImpersonationBanner />
+      <div className="flex flex-1 overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 border-r border-border bg-card flex-shrink-0">
         {sidebarContent}
@@ -209,6 +212,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+      </div>
       </div>
     </div>
   );

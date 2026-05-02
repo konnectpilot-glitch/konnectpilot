@@ -29,6 +29,7 @@ import type {
   GeneratePostBody,
   GeneratedPost,
   HealthStatus,
+  ImpersonationSession,
   ListPostsParams,
   Plan,
   PlatformStat,
@@ -1822,6 +1823,90 @@ export const useAdminSetPlan = <
   TContext
 > => {
   return useMutation(getAdminSetPlanMutationOptions(options));
+};
+
+/**
+ * @summary Begin an impersonation session for the given user
+ */
+export const getAdminImpersonateUrl = (id: number) => {
+  return `/api/admin/users/${id}/impersonate`;
+};
+
+export const adminImpersonate = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ImpersonationSession> => {
+  return customFetch<ImpersonationSession>(getAdminImpersonateUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAdminImpersonateMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminImpersonate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminImpersonate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["adminImpersonate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminImpersonate>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return adminImpersonate(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminImpersonateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminImpersonate>>
+>;
+
+export type AdminImpersonateMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Begin an impersonation session for the given user
+ */
+export const useAdminImpersonate = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminImpersonate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminImpersonate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAdminImpersonateMutationOptions(options));
 };
 
 /**
