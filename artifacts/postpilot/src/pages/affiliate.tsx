@@ -63,7 +63,8 @@ export default function AffiliatePage() {
 
   useEffect(() => {
     if (!data) return;
-    setPayoutMethod((data.payoutMethod as any) ?? "paypal");
+    const pm = data.payoutMethod;
+    setPayoutMethod(pm === "stripe_connect" ? "stripe_connect" : "paypal");
     setPaypalEmail(data.paypalEmail ?? "");
     setStripeAcct(data.stripeConnectAccountId ?? "");
   }, [data]);

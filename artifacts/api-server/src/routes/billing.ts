@@ -244,12 +244,24 @@ router.post("/billing/webhooks", async (req: any, res): Promise<void> => {
           },
           "Affiliate commission recorded",
         );
-      } catch (err: any) {
-        // Unique index on stripeInvoiceId — duplicate webhook delivery
-        req.log.info(
-          { invoiceId: invoice.id, err: err?.message },
-          "Skipped duplicate affiliate commission",
-        );
+      } catch (err: unknown) {
+        // Suppress only Postgres unique-constraint violations (code 23505),
+        // which happen when Stripe re-delivers the same invoice webhook.
+        // Any other error must propagate so Stripe can retry the webhook
+        // and we don't silently drop real commission revenue.
+        const pgCode = (err as { code?: string } | null)?.code;
+        if (pgCode === "23505") {
+          req.log.info(
+            { invoiceId: invoice.id },
+            "Skipped duplicate affiliate commission (idempotent webhook delivery)",
+          );
+        } else {
+          req.log.error(
+            { err, invoiceId: invoice.id, affiliateId: ref.affiliateId },
+            "Failed to record affiliate commission",
+          );
+          throw err;
+        }
       }
       break;
     }
