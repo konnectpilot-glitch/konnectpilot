@@ -128,16 +128,16 @@ function ApiClientAuthBridge() {
 }
 
 function AffiliateAttributionBridge() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth();
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isLoaded || !isSignedIn || !userId) return;
     let cancelled = false;
     (async () => {
       const { getStoredReferralCode, hasAttributed, markAttributed } = await import(
         "./lib/affiliate-tracking"
       );
-      if (hasAttributed()) return;
+      if (hasAttributed(userId)) return;
       const code = getStoredReferralCode();
       if (!code) return;
       try {
@@ -150,7 +150,7 @@ function AffiliateAttributionBridge() {
           },
           body: JSON.stringify({ code }),
         });
-        if (!cancelled && res.ok) markAttributed();
+        if (!cancelled && res.ok) markAttributed(userId);
       } catch {
         // ignore — attribution is best effort and will retry on next load
       }
@@ -158,7 +158,7 @@ function AffiliateAttributionBridge() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, getToken]);
+  }, [isLoaded, isSignedIn, userId, getToken]);
 
   return null;
 }

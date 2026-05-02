@@ -1,6 +1,6 @@
 const COOKIE_NAME = "kp_ref";
 const COOKIE_DAYS = 60;
-const ATTRIBUTED_KEY = "kp_ref_attributed";
+const ATTRIBUTED_KEY_PREFIX = "kp_ref_attributed:";
 
 function setCookie(name: string, value: string, days: number) {
   if (typeof document === "undefined") return;
@@ -30,19 +30,19 @@ export function clearReferralCookie(): void {
   document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 }
 
-export function hasAttributed(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(ATTRIBUTED_KEY) === "1";
+export function hasAttributed(userId: string): boolean {
+  if (typeof window === "undefined" || !userId) return false;
+  return window.localStorage.getItem(ATTRIBUTED_KEY_PREFIX + userId) === "1";
 }
 
-export function markAttributed(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ATTRIBUTED_KEY, "1");
+export function markAttributed(userId: string): void {
+  if (typeof window === "undefined" || !userId) return;
+  window.localStorage.setItem(ATTRIBUTED_KEY_PREFIX + userId, "1");
 }
 
-export function clearAttributed(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(ATTRIBUTED_KEY);
+export function clearAttributed(userId: string): void {
+  if (typeof window === "undefined" || !userId) return;
+  window.localStorage.removeItem(ATTRIBUTED_KEY_PREFIX + userId);
 }
 
 /**

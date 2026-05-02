@@ -229,6 +229,32 @@ router.post(
       res.status(404).json({ error: "Affiliate not found" });
       return;
     }
+    const force = req.body?.force === true;
+
+    // Pre-aggregate the pending balance so we can enforce the minimum payout
+    // threshold before mutating any rows.
+    const [pending] = await db
+      .select({
+        total: sql<number>`coalesce(sum(${affiliateCommissionsTable.amountCents}), 0)::int`,
+      })
+      .from(affiliateCommissionsTable)
+      .where(
+        and(
+          eq(affiliateCommissionsTable.affiliateId, aff.id),
+          eq(affiliateCommissionsTable.status, "pending"),
+        ),
+      );
+    const pendingCents = Number(pending?.total ?? 0);
+    if (pendingCents < AFFILIATE_CONFIG.minPayoutCents && !force) {
+      res.status(400).json({
+        error: "Pending balance is below the minimum payout threshold",
+        code: "below_minimum",
+        pendingCents,
+        minPayoutCents: AFFILIATE_CONFIG.minPayoutCents,
+      });
+      return;
+    }
+
     const now = new Date();
     const updated = await db
       .update(affiliateCommissionsTable)
