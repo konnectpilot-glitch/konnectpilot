@@ -106,6 +106,15 @@ export default function BillingPage() {
               {plans?.map((plan, i) => {
                 const isCurrent = currentPlan === plan.id;
                 const isPopular = i === 1;
+                const currentIdx = plans.findIndex((p) => p.id === currentPlan);
+                const isDowngrade = currentIdx > -1 && i < currentIdx;
+                const ctaLabel = isCurrent
+                  ? "Current plan"
+                  : currentPlan === "free" || currentIdx === -1
+                  ? "Start free trial"
+                  : isDowngrade
+                  ? "Downgrade"
+                  : "Upgrade";
                 return (
                   <div
                     key={plan.id}
@@ -152,7 +161,7 @@ export default function BillingPage() {
                       } disabled:opacity-60`}
                     >
                       {loadingPlan === plan.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {isCurrent ? "Current plan" : "Upgrade"}
+                      {ctaLabel}
                     </button>
                   </div>
                 );

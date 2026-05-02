@@ -22,13 +22,13 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
 import { CalendarDays, Library, DollarSign } from "lucide-react";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useGetMyUsage } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
 import WorkspaceSwitcher from "./workspace-switcher";
 
 type NavChild = { href: string; label: string; icon: any };
-type NavItem = { href: string; label: string; icon: any; children?: NavChild[] };
+type NavItem = { href: string; label: string; icon: any; children?: NavChild[]; expandWhenInactive?: boolean };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,6 +42,7 @@ const navItems: NavItem[] = [
       { href: "/generate?tab=image", label: "Post Image", icon: Image },
       { href: "/generate?tab=video", label: "Video Script", icon: Clapperboard },
     ],
+    expandWhenInactive: false,
   },
   { href: "/library", label: "Library", icon: Library },
   { href: "/schedules", label: "Auto Post", icon: CalendarClock },
@@ -56,14 +57,16 @@ const adminNavItem: NavItem = { href: "/admin", label: "Admin", icon: Shield };
 
 function PlanBadge({ plan }: { plan: string }) {
   const colors: Record<string, string> = {
-    free: "bg-gray-100 text-gray-600",
+    free: "bg-secondary text-muted-foreground",
     starter: "bg-blue-50 text-blue-700",
     pro: "bg-purple-50 text-purple-700",
+    business: "bg-amber-50 text-amber-700",
     agency: "bg-amber-50 text-amber-700",
   };
+  const label = plan === "free" ? "Free plan" : `${plan} plan`;
   return (
-    <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full capitalize", colors[plan] ?? colors.free)}>
-      {plan}
+    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize hover:opacity-80 transition-opacity", colors[plan] ?? colors.free)}>
+      {label}
     </span>
   );
 }
@@ -74,7 +77,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { signOut } = useClerk();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: me } = useGetMe();
+  const { data: usage } = useGetMyUsage();
   const visibleNavItems = me?.isSuperadmin ? [...navItems, adminNavItem] : navItems;
+  const currentPlan = usage?.plan ?? "free";
 
   // Check if we're on the generate page — keep sub-items visible
   const onGeneratePage = location === "/generate" || location.startsWith("/generate");
@@ -155,6 +160,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <p className="text-sm font-medium text-foreground truncate">
               {user?.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : user?.emailAddresses?.[0]?.emailAddress}
             </p>
+            <Link href="/billing" className="inline-block mt-0.5">
+              <PlanBadge plan={currentPlan} />
+            </Link>
           </div>
         </div>
         <button

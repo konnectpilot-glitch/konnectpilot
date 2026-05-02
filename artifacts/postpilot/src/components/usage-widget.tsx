@@ -4,10 +4,16 @@ import { Sparkles, Image as ImageIcon, ArrowRight } from "lucide-react";
 
 function Bar({ used, limit, label, icon: Icon }: { used: number; limit: number | null | undefined; label: string; icon: any }) {
   const isUnlimited = limit === null || limit === undefined;
-  const pct = isUnlimited ? 0 : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+  const pct = isUnlimited ? 100 : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
   const danger = !isUnlimited && pct >= 90;
   const warn = !isUnlimited && pct >= 75 && pct < 90;
-  const barColor = danger ? "bg-red-500" : warn ? "bg-amber-500" : "bg-primary";
+  const barColor = isUnlimited
+    ? "bg-gradient-to-r from-primary via-blue-500 to-indigo-500"
+    : danger
+    ? "bg-red-500"
+    : warn
+    ? "bg-amber-500"
+    : "bg-primary";
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1.5">
@@ -17,13 +23,13 @@ function Bar({ used, limit, label, icon: Icon }: { used: number; limit: number |
         </span>
         <span className="font-medium text-foreground">
           {used}
-          {isUnlimited ? " / ∞" : ` / ${limit}`}
+          {isUnlimited ? " · Unlimited" : ` / ${limit}`}
         </span>
       </div>
       <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
         <div
           className={`h-full ${barColor} transition-all`}
-          style={{ width: isUnlimited ? "8%" : `${pct}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
