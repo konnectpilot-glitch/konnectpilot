@@ -7,6 +7,7 @@ import {
   useListBrands,
 } from "@workspace/api-client-react";
 import { Building2, FileText, Sparkles, TrendingUp, Plus, ArrowRight } from "lucide-react";
+import UsageWidget from "@/components/usage-widget";
 import { Facebook, Instagram, Linkedin } from "lucide-react";
 import { FaTiktok } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
@@ -122,6 +123,7 @@ export default function DashboardPage() {
 
           {/* Side panel */}
           <div className="space-y-4">
+            <UsageWidget />
             {/* Platform breakdown */}
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-border">

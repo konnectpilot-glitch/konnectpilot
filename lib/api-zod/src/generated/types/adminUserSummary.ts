@@ -5,23 +5,25 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { UserPlan } from "./userPlan";
 
-export interface User {
+export interface AdminUserSummary {
   id: number;
   clerkId: string;
   email: string;
   /** @nullable */
   name?: string | null;
-  plan: UserPlan;
+  plan: string;
   isSuperadmin: boolean;
-  /** @nullable */
-  stripeCustomerId?: string | null;
-  /** @nullable */
-  stripeSubscriptionId?: string | null;
   /** @nullable */
   subscriptionStatus?: string | null;
   /** @nullable */
   trialEndsAt?: string | null;
+  brandCount: number;
+  postCount: number;
+  captionUsed: number;
+  imageUsed: number;
+  mrrCents: number;
+  /** @nullable */
+  lastActivityAt?: string | null;
   createdAt: string;
 }

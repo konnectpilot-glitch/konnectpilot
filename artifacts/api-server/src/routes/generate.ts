@@ -9,8 +9,20 @@ import {
 import { requireAuth, ensureUser } from "./users";
 import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
 
 const router: IRouter = Router();
+
+function quotaExceededResponse(res: any, kind: "caption" | "image", used: number, limit: number, plan: string) {
+  res.status(402).json({
+    error: `Monthly ${kind} quota reached (${used}/${limit}) on the ${plan} plan. Upgrade to keep generating.`,
+    code: "quota_exceeded",
+    kind,
+    used,
+    limit,
+    plan,
+  });
+}
 
 function buildPrompt(brand: any, platform: string, topic?: string | null): string {
   const platformInstructions: Record<string, string> = {
@@ -56,21 +68,33 @@ router.post("/generate", requireAuth, async (req: any, res): Promise<void> => {
     return;
   }
 
+  const reservation = await reserveQuota(user.id, user.plan, "caption");
+  if (!reservation.allowed) {
+    quotaExceededResponse(res, "caption", reservation.used, reservation.limit, user.plan);
+    return;
+  }
+
   const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic);
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
-    max_completion_tokens: 1024,
-    messages: [{ role: "user", content: prompt }],
-  });
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      max_completion_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
 
-  const content = completion.choices[0]?.message?.content ?? "";
+    const content = completion.choices[0]?.message?.content ?? "";
+    await setReservationTokens(reservation.reservationId, completion.usage?.total_tokens);
 
-  res.json(GeneratePostResponse.parse({
-    content,
-    platform: parsed.data.platform,
-    brandId: parsed.data.brandId,
-  }));
+    res.json(GeneratePostResponse.parse({
+      content,
+      platform: parsed.data.platform,
+      brandId: parsed.data.brandId,
+    }));
+  } catch (err) {
+    await releaseReservation(reservation.reservationId);
+    throw err;
+  }
 });
 
 router.post("/generate/image", requireAuth, async (req: any, res): Promise<void> => {
@@ -80,6 +104,12 @@ router.post("/generate/image", requireAuth, async (req: any, res): Promise<void>
   // Allow pure custom prompt with no brand required
   if (!customPrompt && !brandId) {
     res.status(400).json({ error: "Provide either a custom prompt or a brand" });
+    return;
+  }
+
+  const imageReservation = await reserveQuota(user.id, user.plan, "image");
+  if (!imageReservation.allowed) {
+    quotaExceededResponse(res, "image", imageReservation.used, imageReservation.limit, user.plan);
     return;
   }
 
@@ -96,6 +126,7 @@ router.post("/generate/image", requireAuth, async (req: any, res): Promise<void>
       .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.userId, user.id)));
 
     if (!brand) {
+      await releaseReservation(imageReservation.reservationId);
       res.status(404).json({ error: "Brand not found" });
       return;
     }
@@ -123,12 +154,14 @@ No text overlays. Clean composition with strong visual hierarchy.`;
     clearTimeout(timeout);
 
     if (!imgRes.ok) {
+      await releaseReservation(imageReservation.reservationId);
       res.status(502).json({ error: "Image generation service returned an error. Please try again." });
       return;
     }
 
     const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
     if (!contentType.startsWith("image/")) {
+      await releaseReservation(imageReservation.reservationId);
       res.status(502).json({ error: "Image generation service returned invalid content. Please try again." });
       return;
     }
@@ -139,6 +172,7 @@ No text overlays. Clean composition with strong visual hierarchy.`;
 
     res.json({ imageUrl: dataUrl, prompt: imagePrompt });
   } catch (err: any) {
+    await releaseReservation(imageReservation.reservationId);
     const isTimeout = err?.name === "AbortError";
     res.status(isTimeout ? 504 : 500).json({
       error: isTimeout
@@ -164,6 +198,12 @@ router.post("/generate/video-script", requireAuth, async (req: any, res): Promis
 
   if (!brand) {
     res.status(404).json({ error: "Brand not found" });
+    return;
+  }
+
+  const vsReservation = await reserveQuota(user.id, user.plan, "video_script");
+  if (!vsReservation.allowed) {
+    quotaExceededResponse(res, "caption", vsReservation.used, vsReservation.limit, user.plan);
     return;
   }
 
@@ -194,13 +234,20 @@ Write a complete short-form video script in JSON format with this exact structur
 
 Return ONLY valid JSON. No markdown, no explanation.`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
-    max_completion_tokens: 2048,
-    messages: [{ role: "user", content: scriptPrompt }],
-  });
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      max_completion_tokens: 2048,
+      messages: [{ role: "user", content: scriptPrompt }],
+    });
+  } catch (err) {
+    await releaseReservation(vsReservation.reservationId);
+    throw err;
+  }
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
+  await setReservationTokens(vsReservation.reservationId, completion.usage?.total_tokens);
 
   let script: any;
   try {

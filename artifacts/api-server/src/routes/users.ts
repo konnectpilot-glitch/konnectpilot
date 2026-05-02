@@ -38,10 +38,26 @@ router.get("/users/me", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);
   res.json(GetMeResponse.parse({
     ...user,
+    isSuperadmin: user.isSuperadmin,
     trialEndsAt: user.trialEndsAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
   }));
 });
+
+export async function requireSuperadmin(req: any, res: any, next: any): Promise<void> {
+  const auth = req.clerkUserId ? null : null; // placeholder for typing
+  if (!req.clerkUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  if (!user.isSuperadmin) {
+    res.status(403).json({ error: "Forbidden: superadmin only" });
+    return;
+  }
+  req.adminUser = user;
+  next();
+}
 
 router.patch("/users/me", requireAuth, async (req: any, res): Promise<void> => {
   const user = await ensureUser(req.clerkUserId, req.clerkEmail);

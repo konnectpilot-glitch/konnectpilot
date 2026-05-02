@@ -16,14 +16,19 @@ import {
   ChevronDown,
   Share2,
   CalendarClock,
+  Shield,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
 import { CalendarDays, Library, DollarSign } from "lucide-react";
+import { useGetMe } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 
-const navItems = [
+type NavChild = { href: string; label: string; icon: any };
+type NavItem = { href: string; label: string; icon: any; children?: NavChild[] };
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/brands", label: "Brands", icon: Building2 },
@@ -45,6 +50,8 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+const adminNavItem: NavItem = { href: "/admin", label: "Admin", icon: Shield };
+
 function PlanBadge({ plan }: { plan: string }) {
   const colors: Record<string, string> = {
     free: "bg-gray-100 text-gray-600",
@@ -64,6 +71,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: me } = useGetMe();
+  const visibleNavItems = me?.isSuperadmin ? [...navItems, adminNavItem] : navItems;
 
   // Check if we're on the generate page — keep sub-items visible
   const onGeneratePage = location === "/generate" || location.startsWith("/generate");
@@ -80,7 +89,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon, children: subItems }) => {
+        {visibleNavItems.map(({ href, label, icon: Icon, children: subItems }) => {
           const isActive = location === href || (location.startsWith(href + "?") || location.startsWith(href + "/"));
           const hasChildren = subItems && subItems.length > 0;
 

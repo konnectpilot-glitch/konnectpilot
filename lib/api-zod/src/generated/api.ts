@@ -24,6 +24,7 @@ export const GetMeResponse = zod.object({
   email: zod.string(),
   name: zod.string().nullish(),
   plan: zod.enum(["free", "starter", "pro", "agency"]),
+  isSuperadmin: zod.boolean(),
   stripeCustomerId: zod.string().nullish(),
   stripeSubscriptionId: zod.string().nullish(),
   subscriptionStatus: zod.string().nullish(),
@@ -44,6 +45,7 @@ export const UpdateMeResponse = zod.object({
   email: zod.string(),
   name: zod.string().nullish(),
   plan: zod.enum(["free", "starter", "pro", "agency"]),
+  isSuperadmin: zod.boolean(),
   stripeCustomerId: zod.string().nullish(),
   stripeSubscriptionId: zod.string().nullish(),
   subscriptionStatus: zod.string().nullish(),
@@ -269,6 +271,123 @@ export const GetRecentPostsResponseItem = zod.object({
   createdAt: zod.string(),
 });
 export const GetRecentPostsResponse = zod.array(GetRecentPostsResponseItem);
+
+/**
+ * @summary Get current user's monthly AI usage and limits
+ */
+export const GetMyUsageResponse = zod.object({
+  plan: zod.string(),
+  captionUsed: zod.number(),
+  captionLimit: zod.number().nullish(),
+  imageUsed: zod.number(),
+  imageLimit: zod.number().nullish(),
+  periodStart: zod.string(),
+});
+
+/**
+ * @summary List all users (superadmin only)
+ */
+export const AdminListUsersResponseItem = zod.object({
+  id: zod.number(),
+  clerkId: zod.string(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  plan: zod.string(),
+  isSuperadmin: zod.boolean(),
+  subscriptionStatus: zod.string().nullish(),
+  trialEndsAt: zod.string().nullish(),
+  brandCount: zod.number(),
+  postCount: zod.number(),
+  captionUsed: zod.number(),
+  imageUsed: zod.number(),
+  mrrCents: zod.number(),
+  lastActivityAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const AdminListUsersResponse = zod.array(AdminListUsersResponseItem);
+
+/**
+ * @summary Reset a user's 14-day trial
+ */
+export const AdminResetTrialParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminResetTrialResponse = zod.object({
+  id: zod.number(),
+  clerkId: zod.string(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  plan: zod.string(),
+  isSuperadmin: zod.boolean(),
+  subscriptionStatus: zod.string().nullish(),
+  trialEndsAt: zod.string().nullish(),
+  brandCount: zod.number(),
+  postCount: zod.number(),
+  captionUsed: zod.number(),
+  imageUsed: zod.number(),
+  mrrCents: zod.number(),
+  lastActivityAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Change a user's plan
+ */
+export const AdminSetPlanParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminSetPlanBody = zod.object({
+  plan: zod.enum(["free", "starter", "pro", "agency"]),
+});
+
+export const AdminSetPlanResponse = zod.object({
+  id: zod.number(),
+  clerkId: zod.string(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  plan: zod.string(),
+  isSuperadmin: zod.boolean(),
+  subscriptionStatus: zod.string().nullish(),
+  trialEndsAt: zod.string().nullish(),
+  brandCount: zod.number(),
+  postCount: zod.number(),
+  captionUsed: zod.number(),
+  imageUsed: zod.number(),
+  mrrCents: zod.number(),
+  lastActivityAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Toggle superadmin flag on a user
+ */
+export const AdminSetSuperadminParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminSetSuperadminBody = zod.object({
+  isSuperadmin: zod.boolean(),
+});
+
+export const AdminSetSuperadminResponse = zod.object({
+  id: zod.number(),
+  clerkId: zod.string(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  plan: zod.string(),
+  isSuperadmin: zod.boolean(),
+  subscriptionStatus: zod.string().nullish(),
+  trialEndsAt: zod.string().nullish(),
+  brandCount: zod.number(),
+  postCount: zod.number(),
+  captionUsed: zod.number(),
+  imageUsed: zod.number(),
+  mrrCents: zod.number(),
+  lastActivityAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
 
 /**
  * @summary Get post counts by platform

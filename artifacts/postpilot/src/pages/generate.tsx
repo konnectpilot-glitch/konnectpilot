@@ -115,7 +115,15 @@ export default function GeneratePage() {
           setGeneratedPlatform(data.platform);
           setGeneratedBrandId(Number(data.brandId));
         },
-        onError: (err: any) => toast.error(err?.data?.error ?? "Failed to generate post"),
+        onError: (err: any) => {
+          const code = err?.data?.code;
+          const msg = err?.data?.error ?? "Failed to generate post";
+          if (code === "quota_exceeded") {
+            toast.error(msg, { action: { label: "Upgrade", onClick: () => (window.location.href = "/billing") } });
+          } else {
+            toast.error(msg);
+          }
+        },
       }
     );
   }
@@ -147,7 +155,13 @@ export default function GeneratePage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Image generation failed");
+      if (!res.ok) {
+        if (json?.code === "quota_exceeded") {
+          toast.error(json.error, { action: { label: "Upgrade", onClick: () => (window.location.href = "/billing") } });
+          return;
+        }
+        throw new Error(json.error ?? "Image generation failed");
+      }
       setGeneratedImageUrl(json.imageUrl);
     } catch (err: any) {
       toast.error(err.message ?? "Failed to generate image");
@@ -182,7 +196,13 @@ export default function GeneratePage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Video script generation failed");
+      if (!res.ok) {
+        if (json?.code === "quota_exceeded") {
+          toast.error(json.error, { action: { label: "Upgrade", onClick: () => (window.location.href = "/billing") } });
+          return;
+        }
+        throw new Error(json.error ?? "Video script generation failed");
+      }
       setVideoScript(json.script);
     } catch (err: any) {
       toast.error(err.message ?? "Failed to generate video script");

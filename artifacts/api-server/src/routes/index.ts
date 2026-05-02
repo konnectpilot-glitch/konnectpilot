@@ -8,6 +8,8 @@ import billingRouter from "./billing";
 import dashboardRouter from "./dashboard";
 import socialAccountsRouter from "./social-accounts";
 import schedulesRouter from "./schedules";
+import usageRouter from "./usage";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(billingRouter);
 router.use(dashboardRouter);
 router.use(socialAccountsRouter);
 router.use(schedulesRouter);
+router.use(usageRouter);
+router.use(adminRouter);
 
 export default router;

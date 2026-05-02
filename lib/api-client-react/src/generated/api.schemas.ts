@@ -29,6 +29,7 @@ export interface User {
   /** @nullable */
   name?: string | null;
   plan: UserPlan;
+  isSuperadmin: boolean;
   /** @nullable */
   stripeCustomerId?: string | null;
   /** @nullable */
@@ -211,6 +212,57 @@ export interface DashboardStats {
 export interface PlatformStat {
   platform: string;
   count: number;
+}
+
+export interface UsageStats {
+  plan: string;
+  captionUsed: number;
+  /** @nullable */
+  captionLimit?: number | null;
+  imageUsed: number;
+  /** @nullable */
+  imageLimit?: number | null;
+  periodStart: string;
+}
+
+export interface AdminUserSummary {
+  id: number;
+  clerkId: string;
+  email: string;
+  /** @nullable */
+  name?: string | null;
+  plan: string;
+  isSuperadmin: boolean;
+  /** @nullable */
+  subscriptionStatus?: string | null;
+  /** @nullable */
+  trialEndsAt?: string | null;
+  brandCount: number;
+  postCount: number;
+  captionUsed: number;
+  imageUsed: number;
+  mrrCents: number;
+  /** @nullable */
+  lastActivityAt?: string | null;
+  createdAt: string;
+}
+
+export type AdminSetPlanBodyPlan =
+  (typeof AdminSetPlanBodyPlan)[keyof typeof AdminSetPlanBodyPlan];
+
+export const AdminSetPlanBodyPlan = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+  agency: "agency",
+} as const;
+
+export interface AdminSetPlanBody {
+  plan: AdminSetPlanBodyPlan;
+}
+
+export interface AdminSetSuperadminBody {
+  isSuperadmin: boolean;
 }
 
 export type ListPostsParams = {

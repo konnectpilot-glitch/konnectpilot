@@ -22,6 +22,10 @@ tags:
     description: Stripe billing
   - name: dashboard
     description: Dashboard analytics
+  - name: usage
+    description: AI usage and quotas
+  - name: admin
+    description: Super-admin operations
 
 paths:
   /healthz:
@@ -470,6 +474,143 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /usage/me:
+    get:
+      operationId: getMyUsage
+      tags: [usage]
+      summary: Get current user's monthly AI usage and limits
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Usage stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageStats"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users (superadmin only)
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: List of users with summary metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUserSummary"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users/{id}/reset-trial:
+    post:
+      operationId: adminResetTrial
+      tags: [admin]
+      summary: Reset a user's 14-day trial
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserSummary"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users/{id}/plan:
+    patch:
+      operationId: adminSetPlan
+      tags: [admin]
+      summary: Change a user's plan
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSetPlanBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserSummary"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users/{id}/superadmin:
+    patch:
+      operationId: adminSetSuperadmin
+      tags: [admin]
+      summary: Toggle superadmin flag on a user
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSetSuperadminBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserSummary"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /dashboard/platform-breakdown:
     get:
       operationId: getPlatformBreakdown
@@ -530,6 +671,8 @@ components:
         plan:
           type: string
           enum: [free, starter, pro, agency]
+        isSuperadmin:
+          type: boolean
         stripeCustomerId:
           type: ["string", "null"]
         stripeSubscriptionId:
@@ -545,6 +688,7 @@ components:
         - clerkId
         - email
         - plan
+        - isSuperadmin
         - createdAt
 
     UpdateUserBody:
@@ -814,3 +958,87 @@ components:
       required:
         - platform
         - count
+
+    UsageStats:
+      type: object
+      properties:
+        plan:
+          type: string
+        captionUsed:
+          type: integer
+        captionLimit:
+          type: ["integer", "null"]
+        imageUsed:
+          type: integer
+        imageLimit:
+          type: ["integer", "null"]
+        periodStart:
+          type: string
+      required:
+        - plan
+        - captionUsed
+        - imageUsed
+        - periodStart
+
+    AdminUserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkId:
+          type: string
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        plan:
+          type: string
+        isSuperadmin:
+          type: boolean
+        subscriptionStatus:
+          type: ["string", "null"]
+        trialEndsAt:
+          type: ["string", "null"]
+        brandCount:
+          type: integer
+        postCount:
+          type: integer
+        captionUsed:
+          type: integer
+        imageUsed:
+          type: integer
+        mrrCents:
+          type: integer
+        lastActivityAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - clerkId
+        - email
+        - plan
+        - isSuperadmin
+        - brandCount
+        - postCount
+        - captionUsed
+        - imageUsed
+        - mrrCents
+        - createdAt
+
+    AdminSetPlanBody:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [free, starter, pro, agency]
+      required:
+        - plan
+
+    AdminSetSuperadminBody:
+      type: object
+      properties:
+        isSuperadmin:
+          type: boolean
+      required:
+        - isSuperadmin
