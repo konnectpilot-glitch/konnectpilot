@@ -11,14 +11,31 @@ const VALUES = [
 export default function AboutPage() {
   return (
     <MarketingShell>
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-20 pb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl font-bold text-foreground leading-tight mb-5">
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-10 text-center">
+        <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight leading-[1.05] mb-5">
           We help small teams<br />
-          <span className="text-primary">show up consistently.</span>
+          <span className="bg-gradient-to-r from-primary via-blue-600 to-indigo-500 bg-clip-text text-transparent">
+            show up consistently.
+          </span>
         </h1>
         <p className="text-lg text-muted-foreground">
           KonnectPilot is built by ClicknKonnect — a small team obsessed with making social media less of a daily grind for the people who don't have a dedicated marketer.
         </p>
+      </section>
+
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
+        <div className="grid grid-cols-3 gap-3 sm:gap-6">
+          {[
+            { v: "3", l: "Connected platforms today" },
+            { v: "100%", l: "Customer-funded — no VCs" },
+            { v: "1", l: "Subscription, no add-ons" },
+          ].map((s) => (
+            <div key={s.l} className="bg-card border border-border rounded-xl p-4 sm:p-5 text-center">
+              <p className="text-2xl sm:text-3xl font-bold text-primary">{s.v}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">{s.l}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-12 prose prose-neutral dark:prose-invert">

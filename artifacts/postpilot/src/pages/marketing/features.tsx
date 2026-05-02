@@ -1,8 +1,19 @@
 import MarketingShell from "@/components/marketing-shell";
 import { Link } from "wouter";
 import {
-  Bot, Calendar, Image as ImageIcon, BarChart3, Users, Shield,
-  Sparkles, Layers, Zap, ArrowRight, Check,
+  Bot,
+  Calendar,
+  Image as ImageIcon,
+  BarChart3,
+  Users,
+  Shield,
+  Sparkles,
+  Layers,
+  Zap,
+  ArrowRight,
+  Check,
+  MessageSquare,
+  Clock,
 } from "lucide-react";
 
 const PILLARS = [
@@ -16,17 +27,19 @@ const PILLARS = [
       "Hashtag suggestions tuned to platform & audience",
       "Per-platform overrides — one post, perfect everywhere",
     ],
+    visual: "create",
   },
   {
     icon: Calendar,
     title: "Schedule",
     blurb: "Plan a month in an afternoon. Queue, calendar, and multi-schedule.",
     bullets: [
-      "Monthly + weekly calendar view",
+      "Monthly + weekly calendar views",
       "Recurring queue slots per account",
       "Multi-schedule: fan one post out to many accounts at many times",
       "Timezone-aware scheduling",
     ],
+    visual: "schedule",
   },
   {
     icon: BarChart3,
@@ -38,8 +51,9 @@ const PILLARS = [
       "Workspace overview with growth trends",
       "Export to CSV",
     ],
+    visual: "analyze",
   },
-];
+] as const;
 
 const FEATURES = [
   { icon: Bot, title: "AI captions & images", text: "ChatGPT for words, AI image gen for visuals — built into the composer." },
@@ -47,37 +61,176 @@ const FEATURES = [
   { icon: Layers, title: "Multi-schedule", text: "Send one post to many accounts at many times in a single action." },
   { icon: ImageIcon, title: "Content library", text: "Reusable assets, AI generations, and templates in one place." },
   { icon: Users, title: "Team collaboration", text: "Roles, approval workflow, and threaded comments on drafts." },
+  { icon: MessageSquare, title: "Threaded comments", text: "Discuss drafts inline before they go live — no more screenshot ping-pong." },
   { icon: Shield, title: "Built for trust", text: "Encrypted tokens, audit log, GDPR data export — agency-ready." },
+  { icon: Clock, title: "Timezone aware", text: "Schedule in your timezone, publish in theirs. Never miss prime time." },
+  { icon: BarChart3, title: "Growth-first analytics", text: "Trends that matter, not vanity metrics buried in a 12-tab dashboard." },
 ];
+
+function PillarVisual({ kind }: { kind: "create" | "schedule" | "analyze" }) {
+  if (kind === "create") {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="text-xs font-semibold text-foreground">AI Composer</span>
+          <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">
+            GPT-4
+          </span>
+        </div>
+        <div className="space-y-2 mb-3">
+          <div className="flex flex-wrap gap-1.5">
+            {["Professional", "Friendly", "Witty", "Bold", "Inspirational"].map((t, i) => (
+              <span
+                key={t}
+                className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                  i === 1
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-3 text-[11px] leading-relaxed text-foreground border border-border">
+          <span className="font-semibold">Slow mornings, fast espresso ☕</span>
+          <br />
+          <span className="text-muted-foreground">
+            Stop by before 10am for our weekday cappuccino — single origin, made by people who care.
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1 mt-2">
+          {["#localcoffee", "#smallbatch", "#morningroutine", "#cafe", "#brew"].map((t) => (
+            <span key={t} className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              {t}
+            </span>
+          ))}
+        </div>
+        <div className="mt-3 aspect-[4/2] rounded-lg bg-gradient-to-br from-amber-200 via-orange-300 to-pink-300 flex items-center justify-center">
+          <ImageIcon className="w-8 h-8 text-white/70" />
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "schedule") {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar className="w-4 h-4 text-primary" />
+          <span className="text-xs font-semibold text-foreground">Calendar · May 2026</span>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-[9px] text-muted-foreground mb-1">
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <div key={i} className="text-center font-semibold">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 35 }).map((_, i) => {
+            const day = i - 2;
+            const inMonth = day > 0 && day <= 31;
+            const dotPattern = [false, true, true, false, true, true, false];
+            const hasDot = inMonth && dotPattern[i % 7];
+            const isToday = day === 12;
+            return (
+              <div
+                key={i}
+                className={`aspect-square rounded text-[10px] flex flex-col items-center justify-center ${
+                  isToday
+                    ? "bg-primary text-primary-foreground font-bold"
+                    : inMonth
+                    ? "bg-secondary/40 text-foreground"
+                    : "bg-transparent text-muted-foreground/40"
+                }`}
+              >
+                <span>{inMonth ? day : ""}</span>
+                {hasDot && (
+                  <div className="flex gap-0.5 mt-0.5">
+                    <span className="w-1 h-1 rounded-full bg-blue-500" />
+                    <span className="w-1 h-1 rounded-full bg-pink-500" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"/> Facebook</span>
+          <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-pink-500"/> Instagram</span>
+          <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-700"/> LinkedIn</span>
+        </div>
+      </div>
+    );
+  }
+
+  // analyze
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-4 h-4 text-primary" />
+        <span className="text-xs font-semibold text-foreground">Engagement · Last 30 days</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { label: "Reach", value: "48.2k", delta: "+12%" },
+          { label: "Engagement", value: "3.4k", delta: "+24%" },
+          { label: "Followers", value: "+612", delta: "+9%" },
+        ].map((s) => (
+          <div key={s.label} className="bg-secondary/40 border border-border rounded-lg p-2.5">
+            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">{s.label}</p>
+            <p className="text-sm font-bold text-foreground">{s.value}</p>
+            <p className="text-[9px] text-emerald-600 font-semibold">{s.delta}</p>
+          </div>
+        ))}
+      </div>
+      <div className="h-24 flex items-end gap-1.5">
+        {[35, 48, 42, 60, 55, 72, 65, 80, 75, 88, 82, 95].map((h, i) => (
+          <div
+            key={i}
+            className="flex-1 bg-gradient-to-t from-primary to-blue-400 rounded-t opacity-90"
+            style={{ height: `${h}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+        <span>Apr 1</span><span>Apr 15</span><span>Apr 30</span>
+      </div>
+    </div>
+  );
+}
 
 export default function FeaturesPage() {
   return (
     <MarketingShell>
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-20 pb-12 text-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-12 text-center">
         <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-3 py-1.5 rounded-full mb-6">
           <Zap className="w-3.5 h-3.5" />
           Everything you need to grow
         </div>
-        <h1 className="text-4xl sm:text-5xl font-bold text-foreground leading-tight mb-5">
+        <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight leading-[1.05] mb-5">
           One tool. Three pillars.<br />
-          <span className="text-primary">Endless content.</span>
+          <span className="bg-gradient-to-r from-primary via-blue-600 to-indigo-500 bg-clip-text text-transparent">
+            Endless content.
+          </span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           KonnectPilot brings AI creation, multi-platform scheduling, and real analytics into one polished workflow.
         </p>
       </section>
 
-      {PILLARS.map(({ icon: Icon, title, blurb, bullets }, i) => (
+      {PILLARS.map(({ icon: Icon, title, blurb, bullets, visual }, i) => (
         <section
           key={title}
-          className={`py-16 ${i % 2 === 1 ? "bg-secondary/40" : ""}`}
+          className={`py-16 ${i % 2 === 1 ? "bg-secondary/40 border-y border-border" : ""}`}
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-12 items-center">
             <div className={i % 2 === 1 ? "md:order-2" : ""}>
               <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
                 <Icon className="w-6 h-6 text-primary" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">{title}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3 tracking-tight">{title}</h2>
               <p className="text-muted-foreground mb-5">{blurb}</p>
               <ul className="space-y-2.5">
                 {bullets.map((b) => (
@@ -88,20 +241,26 @@ export default function FeaturesPage() {
                 ))}
               </ul>
             </div>
-            <div className={`bg-card border border-border rounded-2xl shadow-sm aspect-[4/3] flex items-center justify-center ${i % 2 === 1 ? "md:order-1" : ""}`}>
-              <Icon className="w-24 h-24 text-primary/20" />
+            <div className={i % 2 === 1 ? "md:order-1" : ""}>
+              <PillarVisual kind={visual} />
             </div>
           </div>
         </section>
       ))}
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
-        <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-10">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
+        <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-3 tracking-tight">
           Plus everything else you'd expect
         </h2>
-        <div className="grid md:grid-cols-3 gap-6">
+        <p className="text-center text-muted-foreground mb-10">
+          The boring-but-essential stuff, done right.
+        </p>
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5">
           {FEATURES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="bg-card border border-border rounded-xl p-5">
+            <div
+              key={title}
+              className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all"
+            >
               <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-3">
                 <Icon className="w-5 h-5 text-primary" />
               </div>
@@ -112,17 +271,17 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
-        <div className="bg-primary rounded-2xl px-8 py-12 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-primary-foreground mb-3">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+        <div className="bg-gradient-to-br from-primary via-blue-600 to-indigo-600 rounded-3xl px-8 py-12 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-primary-foreground mb-3 tracking-tight">
             Ready to fly on autopilot?
           </h2>
-          <p className="text-primary-foreground/80 mb-6 max-w-lg mx-auto">
+          <p className="text-primary-foreground/85 mb-6 max-w-lg mx-auto">
             Start your 7-day free trial. No charge until day 7. Cancel anytime.
           </p>
           <Link
             href="/sign-up"
-            className="inline-flex items-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90 transition-colors"
+            className="inline-flex items-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90 transition-colors shadow-md"
           >
             Start free trial
             <ArrowRight className="w-4 h-4" />
