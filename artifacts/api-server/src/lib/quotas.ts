@@ -101,7 +101,7 @@ export async function reserveQuota(
 
   const bucketKinds: AiUsageKind[] = bucket === "image" ? ["image"] : ["caption", "video_script"];
 
-  const inserted = await db.execute(sql`
+  const inserted = await db.execute<{ id: number }>(sql`
     INSERT INTO ai_usage (user_id, kind, tokens_used)
     SELECT ${userId}, ${kind}, NULL
     WHERE (
@@ -113,11 +113,9 @@ export async function reserveQuota(
     RETURNING id
   `);
 
-  const rows = (inserted as any).rows ?? (inserted as any);
-  const id = Array.isArray(rows) && rows[0] ? Number(rows[0].id) : null;
-
-  if (id !== null) {
-    return { allowed: true, reservationId: id, bucket };
+  const firstRow = inserted.rows[0];
+  if (firstRow) {
+    return { allowed: true, reservationId: Number(firstRow.id), bucket };
   }
 
   const [{ used }] = await db

@@ -45,7 +45,6 @@ router.get("/users/me", requireAuth, async (req: any, res): Promise<void> => {
 });
 
 export async function requireSuperadmin(req: any, res: any, next: any): Promise<void> {
-  const auth = req.clerkUserId ? null : null; // placeholder for typing
   if (!req.clerkUserId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
