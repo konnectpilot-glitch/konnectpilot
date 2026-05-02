@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { getAuth } from "@clerk/express";
+import { getAuth, clerkClient } from "@clerk/express";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import {
   db,
@@ -36,46 +36,102 @@ export function hasRoleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean
 // Backfills any of their legacy records (brands/posts/schedules/social accounts)
 // that have no workspaceId so existing data continues to work after this migration.
 async function ensureUser(clerkId: string, email: string) {
+  // Fast path: user already exists, no bootstrap needed.
   let [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  let personal: typeof workspacesTable.$inferSelect | undefined;
+
   if (!user) {
-    [user] = await db
-      .insert(usersTable)
-      .values({ clerkId, email, plan: "free" })
-      .returning();
+    // Bootstrap path. The dashboard fires many parallel requests on first
+    // sign-in — all of them call ensureUser concurrently. Without
+    // serialization, multiple requests would race to INSERT the user and the
+    // personal workspace, causing unique-constraint 500s and/or duplicate
+    // "Personal" workspaces. We serialize the bootstrap on a Postgres advisory
+    // transaction lock keyed on the Clerk id: only one request per user runs
+    // the bootstrap at a time; the rest wait, then take the fast path on
+    // re-SELECT.
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${clerkId}, 0))`);
+
+      // Re-check inside the lock — a previous waiter may have already created
+      // the user.
+      [user] = await tx.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
+      if (!user) {
+        // Clerk's default session JWT doesn't include the `email` claim, so
+        // when creating a brand-new user we may need to fetch it from Clerk's
+        // API to satisfy the NOT NULL UNIQUE constraint on users.email.
+        let resolvedEmail = email;
+        if (!resolvedEmail) {
+          try {
+            const clerkUser = await clerkClient.users.getUser(clerkId);
+            const primaryId = clerkUser.primaryEmailAddressId;
+            const primary =
+              clerkUser.emailAddresses.find((e: any) => e.id === primaryId) ??
+              clerkUser.emailAddresses[0];
+            resolvedEmail = primary?.emailAddress ?? "";
+          } catch {
+            // fall through — handled below
+          }
+        }
+        if (!resolvedEmail) {
+          // Last-resort placeholder so we never insert an empty string (which
+          // would collide with the unique index for any other user missing an
+          // email).
+          resolvedEmail = `${clerkId}@users.noreply.konnectpilot.local`;
+        }
+        [user] = await tx
+          .insert(usersTable)
+          .values({ clerkId, email: resolvedEmail, plan: "free" })
+          .returning();
+      }
+
+      // Personal workspace.
+      [personal] = await tx
+        .select()
+        .from(workspacesTable)
+        .where(
+          and(eq(workspacesTable.ownerId, user.id), eq(workspacesTable.isPersonal, true)),
+        );
+      if (!personal) {
+        [personal] = await tx
+          .insert(workspacesTable)
+          .values({ name: "Personal", ownerId: user.id, isPersonal: true })
+          .returning();
+      }
+
+      // Owner membership.
+      const [membership] = await tx
+        .select()
+        .from(workspaceMembersTable)
+        .where(
+          and(
+            eq(workspaceMembersTable.workspaceId, personal.id),
+            eq(workspaceMembersTable.userId, user.id),
+          ),
+        );
+      if (!membership) {
+        await tx
+          .insert(workspaceMembersTable)
+          .values({ workspaceId: personal.id, userId: user.id, role: "owner" })
+          .onConflictDoNothing();
+      }
+    });
   }
 
-  // Find or create personal workspace
-  let [personal] = await db
-    .select()
-    .from(workspacesTable)
-    .where(and(eq(workspacesTable.ownerId, user.id), eq(workspacesTable.isPersonal, true)));
+  // For existing users we still need `personal` for the legacy backfill below
+  // and the activeWorkspaceId fallback further down.
   if (!personal) {
     [personal] = await db
-      .insert(workspacesTable)
-      .values({
-        name: "Personal",
-        ownerId: user.id,
-        isPersonal: true,
-      })
-      .returning();
+      .select()
+      .from(workspacesTable)
+      .where(
+        and(eq(workspacesTable.ownerId, user.id), eq(workspacesTable.isPersonal, true)),
+      );
   }
-
-  // Ensure owner membership row exists for the personal workspace
-  const [membership] = await db
-    .select()
-    .from(workspaceMembersTable)
-    .where(
-      and(
-        eq(workspaceMembersTable.workspaceId, personal.id),
-        eq(workspaceMembersTable.userId, user.id),
-      ),
-    );
-  if (!membership) {
-    await db.insert(workspaceMembersTable).values({
-      workspaceId: personal.id,
-      userId: user.id,
-      role: "owner",
-    });
+  if (!personal) {
+    // Defensive: an existing user with no personal workspace shouldn't happen
+    // after the migration, but if it does, surface a clear error rather than a
+    // ReferenceError further down.
+    throw new Error(`User ${user.id} has no personal workspace`);
   }
 
   // Backfill legacy records (one-shot — safe to run repeatedly: only updates rows
