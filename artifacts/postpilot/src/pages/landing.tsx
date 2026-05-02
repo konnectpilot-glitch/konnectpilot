@@ -34,12 +34,18 @@ export default function LandingPage() {
             </div>
             <span className="font-bold text-lg text-foreground">KonnectPilot</span>
           </div>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</Link>
+            <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+            <Link href="/affiliate-program" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Affiliate</Link>
+            <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">About</Link>
+          </nav>
           <div className="flex items-center gap-3">
             <Link href="/sign-in" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Sign in
             </Link>
             <Link href="/sign-up" className="text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
-              Get started free
+              Start free trial
             </Link>
           </div>
         </div>

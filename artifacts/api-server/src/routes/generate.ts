@@ -248,6 +248,8 @@ router.post("/generate/save", requireAuth, async (req: any, res): Promise<void> 
   res.status(201).json({
     ...post,
     brandName: brand.name,
+    imageUrl: post.imageUrl ?? null,
+    scheduledFor: post.scheduledFor?.toISOString() ?? null,
     publishedAt: post.publishedAt?.toISOString() ?? null,
     createdAt: post.createdAt.toISOString(),
   });

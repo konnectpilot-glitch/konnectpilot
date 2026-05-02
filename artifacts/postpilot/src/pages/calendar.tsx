@@ -1,0 +1,246 @@
+import Layout from "@/components/layout";
+import { useState, useMemo } from "react";
+import { Link } from "wouter";
+import { useListPosts } from "@workspace/api-client-react";
+import type { Post } from "@workspace/api-client-react";
+import {
+  ChevronLeft, ChevronRight, CalendarDays, Plus,
+  Facebook, Instagram, Linkedin,
+} from "lucide-react";
+import { FaTiktok } from "react-icons/fa";
+
+const PLATFORM_COLORS: Record<string, string> = {
+  facebook: "bg-blue-100 text-blue-700 border-blue-200",
+  instagram: "bg-pink-100 text-pink-700 border-pink-200",
+  linkedin: "bg-sky-100 text-sky-700 border-sky-200",
+  tiktok: "bg-zinc-100 text-zinc-700 border-zinc-200",
+};
+
+const STATUS_RING: Record<string, string> = {
+  scheduled: "ring-1 ring-amber-300",
+  published: "ring-1 ring-green-300",
+  failed: "ring-1 ring-rose-300",
+  generated: "",
+};
+
+function PlatformDot({ platform }: { platform: string }) {
+  const cls = "w-3 h-3";
+  if (platform === "facebook") return <Facebook className={`${cls} text-blue-600`} />;
+  if (platform === "instagram") return <Instagram className={`${cls} text-pink-600`} />;
+  if (platform === "linkedin") return <Linkedin className={`${cls} text-sky-700`} />;
+  if (platform === "tiktok") return <FaTiktok className={`${cls} text-foreground`} />;
+  return null;
+}
+
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function addMonths(d: Date, n: number) {
+  return new Date(d.getFullYear(), d.getMonth() + n, 1);
+}
+
+function buildGrid(monthStart: Date) {
+  const firstDay = monthStart.getDay();
+  const daysInMonth = new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth() + 1,
+    0,
+  ).getDate();
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(monthStart.getFullYear(), monthStart.getMonth(), d));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+// Pick the timestamp that best represents when this post belongs on the
+// calendar: scheduled posts use scheduledFor, published posts use publishedAt,
+// drafts/generated posts fall back to createdAt.
+function postDate(p: Post): Date {
+  const ts = p.scheduledFor ?? p.publishedAt ?? p.createdAt;
+  return new Date(ts);
+}
+
+export default function CalendarPage() {
+  const [cursor, setCursor] = useState<Date>(startOfMonth(new Date()));
+  const { data: posts, isLoading } = useListPosts();
+
+  const monthLabel = cursor.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const grid = useMemo(() => buildGrid(cursor), [cursor]);
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+
+  const postsByDay = useMemo(() => {
+    const map = new Map<string, Post[]>();
+    (posts ?? []).forEach((p) => {
+      const d = postDate(p);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const list = map.get(key) ?? [];
+      list.push(p);
+      map.set(key, list);
+    });
+    return map;
+  }, [posts]);
+
+  return (
+    <Layout>
+      <div className="p-6 max-w-6xl mx-auto space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Visualize your scheduled and published posts
+            </p>
+          </div>
+          <Link
+            href="/generate"
+            className="inline-flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Post
+          </Link>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <button
+              onClick={() => setCursor(addMonths(cursor, -1))}
+              className="p-2 rounded-lg hover:bg-secondary"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <h2 className="font-semibold text-foreground">{monthLabel}</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCursor(startOfMonth(new Date()))}
+                className="text-xs font-medium border border-border px-2.5 py-1 rounded-md hover:bg-secondary"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setCursor(addMonths(cursor, 1))}
+                className="p-2 rounded-lg hover:bg-secondary"
+                aria-label="Next month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 border-b border-border bg-secondary/40">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div
+                key={d}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 auto-rows-[minmax(110px,1fr)]">
+            {grid.map((day, i) => {
+              const key = day
+                ? `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`
+                : `empty-${i}`;
+              const dayPosts = day ? (postsByDay.get(key) ?? []) : [];
+              const isToday = key === todayKey;
+
+              return (
+                <div
+                  key={key}
+                  className={`border-r border-b border-border p-2 ${
+                    !day ? "bg-secondary/20" : "bg-card"
+                  }`}
+                >
+                  {day && (
+                    <>
+                      <div
+                        className={`text-xs font-medium mb-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded ${
+                          isToday
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </div>
+                      <div className="space-y-1">
+                        {dayPosts.slice(0, 3).map((p) => {
+                          const time = postDate(p).toLocaleTimeString([], {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          });
+                          return (
+                            <div
+                              key={p.id}
+                              title={`${p.status} · ${time}\n${p.content}`}
+                              className={`text-[11px] px-1.5 py-1 rounded border truncate flex items-center gap-1 ${
+                                PLATFORM_COLORS[p.platform] ??
+                                "bg-secondary text-foreground border-border"
+                              } ${STATUS_RING[p.status] ?? ""}`}
+                            >
+                              <PlatformDot platform={p.platform} />
+                              <span className="truncate">{p.content.slice(0, 30)}</span>
+                            </div>
+                          );
+                        })}
+                        {dayPosts.length > 3 && (
+                          <p className="text-[10px] text-muted-foreground pl-1">
+                            +{dayPosts.length - 3} more
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {isLoading && (
+          <div className="text-center text-sm text-muted-foreground">
+            Loading posts...
+          </div>
+        )}
+
+        {!isLoading && (posts?.length ?? 0) === 0 && (
+          <div className="bg-card border border-border rounded-xl p-10 text-center">
+            <CalendarDays className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+            <h3 className="font-semibold text-foreground mb-1">Your calendar is empty</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generate or schedule your first post to see it here.
+            </p>
+            <Link
+              href="/generate"
+              className="inline-flex items-center gap-2 text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90"
+            >
+              <Plus className="w-4 h-4" /> New Post
+            </Link>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm ring-1 ring-amber-300 bg-amber-50" /> Scheduled
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm ring-1 ring-green-300 bg-green-50" /> Published
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm ring-1 ring-rose-300 bg-rose-50" /> Failed
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-blue-50" /> Draft
+          </span>
+        </div>
+      </div>
+    </Layout>
+  );
+}

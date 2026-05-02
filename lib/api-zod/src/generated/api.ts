@@ -159,7 +159,9 @@ export const ListPostsResponseItem = zod.object({
   brandName: zod.string().nullish(),
   platform: zod.string(),
   content: zod.string(),
+  imageUrl: zod.string().nullish(),
   status: zod.enum(["generated", "published", "failed", "scheduled"]),
+  scheduledFor: zod.string().nullish(),
   publishedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -260,7 +262,9 @@ export const GetRecentPostsResponseItem = zod.object({
   brandName: zod.string().nullish(),
   platform: zod.string(),
   content: zod.string(),
+  imageUrl: zod.string().nullish(),
   status: zod.enum(["generated", "published", "failed", "scheduled"]),
+  scheduledFor: zod.string().nullish(),
   publishedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });

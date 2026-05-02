@@ -657,9 +657,13 @@ components:
           type: string
         content:
           type: string
+        imageUrl:
+          type: ["string", "null"]
         status:
           type: string
           enum: [generated, published, failed, scheduled]
+        scheduledFor:
+          type: ["string", "null"]
         publishedAt:
           type: ["string", "null"]
         createdAt:

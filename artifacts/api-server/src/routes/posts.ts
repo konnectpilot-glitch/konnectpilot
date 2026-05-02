@@ -72,6 +72,8 @@ router.get("/posts", requireAuth, async (req: any, res): Promise<void> => {
   res.json(ListPostsResponse.parse(filteredPosts.map(p => ({
     ...p,
     brandName: brandMap.get(p.brandId) ?? null,
+    imageUrl: p.imageUrl ?? null,
+    scheduledFor: p.scheduledFor?.toISOString() ?? null,
     publishedAt: p.publishedAt?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
   }))));

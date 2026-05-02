@@ -20,9 +20,12 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
+import { CalendarDays, Library, DollarSign } from "lucide-react";
+import NotificationsBell from "./notifications-bell";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/brands", label: "Brands", icon: Building2 },
   {
     href: "/generate",
@@ -33,9 +36,11 @@ const navItems = [
       { href: "/generate?tab=video", label: "Video Script", icon: Clapperboard },
     ],
   },
+  { href: "/library", label: "Library", icon: Library },
   { href: "/schedules", label: "Auto Post", icon: CalendarClock },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
+  { href: "/affiliate", label: "Affiliate", icon: DollarSign },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -179,9 +184,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-bold text-foreground">KonnectPilot</span>
           </div>
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-secondary">
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationsBell />
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-secondary">
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </header>
+
+        {/* Desktop top bar */}
+        <header className="hidden md:flex items-center justify-end gap-2 px-6 py-3 border-b border-border bg-card">
+          <NotificationsBell />
         </header>
 
         <main className="flex-1 overflow-y-auto">

@@ -16,6 +16,14 @@ import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
 import SchedulesPage from "@/pages/schedules";
+import CalendarPage from "@/pages/calendar";
+import LibraryPage from "@/pages/library";
+import AffiliatePage from "@/pages/affiliate";
+import FeaturesPage from "@/pages/marketing/features";
+import PricingPage from "@/pages/marketing/pricing";
+import AffiliateLandingPage from "@/pages/marketing/affiliate";
+import AboutPage from "@/pages/marketing/about";
+import LegalPage from "@/pages/marketing/legal";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -195,9 +203,19 @@ function ClerkProviderWithRoutes() {
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/" component={HomeRedirect} />
+          <Route path="/features" component={FeaturesPage} />
+          <Route path="/pricing" component={PricingPage} />
+          <Route path="/affiliate-program" component={AffiliateLandingPage} />
+          <Route path="/about" component={AboutPage} />
+          <Route path="/legal/terms" component={() => <LegalPage slug="terms" />} />
+          <Route path="/legal/privacy" component={() => <LegalPage slug="privacy" />} />
+          <Route path="/legal/cookies" component={() => <LegalPage slug="cookies" />} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
+          <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+          <Route path="/library" component={() => <ProtectedRoute component={LibraryPage} />} />
+          <Route path="/affiliate" component={() => <ProtectedRoute component={AffiliatePage} />} />
           <Route path="/brands/new" component={() => <ProtectedRoute component={BrandFormPage} />} />
           <Route path="/brands/:id" component={() => <ProtectedRoute component={BrandFormPage} />} />
           <Route path="/brands" component={() => <ProtectedRoute component={BrandsPage} />} />

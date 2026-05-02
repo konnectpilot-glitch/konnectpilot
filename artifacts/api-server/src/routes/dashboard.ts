@@ -95,6 +95,8 @@ router.get("/dashboard/recent-posts", requireAuth, async (req: any, res): Promis
   res.json(GetRecentPostsResponse.parse(posts.map(p => ({
     ...p,
     brandName: brandMap.get(p.brandId) ?? null,
+    imageUrl: p.imageUrl ?? null,
+    scheduledFor: p.scheduledFor?.toISOString() ?? null,
     publishedAt: p.publishedAt?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
   }))));

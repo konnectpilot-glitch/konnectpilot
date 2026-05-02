@@ -123,7 +123,11 @@ export interface Post {
   brandName?: string | null;
   platform: string;
   content: string;
+  /** @nullable */
+  imageUrl?: string | null;
   status: PostStatus;
+  /** @nullable */
+  scheduledFor?: string | null;
   /** @nullable */
   publishedAt?: string | null;
   createdAt: string;
