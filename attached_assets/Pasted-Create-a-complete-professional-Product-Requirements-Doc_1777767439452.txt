@@ -1,0 +1,55 @@
+Create a complete professional Product Requirements Document (PRD) for a SaaS platform called "AI Social Media & Blogging Automation Tool".
+
+The platform should allow users to:
+- Connect multiple social media accounts (Facebook, Instagram, LinkedIn) including personal and business pages
+- Manage multiple brands with separate dashboards
+- Auto-generate posts using AI (captions via OpenAI API, images via image generation API)
+- Schedule single and multiple posts with flexible timing
+- Automatically publish posts based on schedule
+- Optimize content per platform (LinkedIn professional, Instagram engaging, Facebook mixed)
+
+Include an advanced "Brand Setup System" where users input:
+- Brand name, colors, tone, audience, industry, keywords
+So AI can generate highly accurate content with minimal errors.
+
+Add a "Content Planner" with:
+- Calendar view
+- Drag-and-drop scheduling
+- Post type ratio control (image vs text posts)
+
+Include a subscription system:
+- Monthly plans + credit-based usage (AI generation credits)
+- Multiple tiers (Starter, Growth, Agency)
+- Credit top-up system
+- 7-day free trial (no free plan)
+
+Add an "Auto Blogging Feature":
+- AI-generated SEO blog posts
+- Daily auto publishing
+- Integration with Shopify and WordPress
+- Keyword-based content generation
+
+Include:
+- User dashboard (analytics, credits, posts overview)
+- Integrations panel (social + website connections)
+- Secure authentication (OAuth)
+- Queue-based scheduling system
+- API rate limit handling
+- Error handling and logs
+
+Define:
+- User roles (individual, business, agency)
+- System architecture (frontend, backend, database, queue)
+- Suggested tech stack (React, Node.js, PostgreSQL, Redis)
+- UI/UX design guidelines (modern SaaS, dark theme, clean and simple)
+
+Also include:
+- Monetization strategy
+- Scalability considerations
+- Future features (analytics, AI learning, hashtag generation)
+
+The PRD should be:
+- Structured professionally
+- Clear and detailed
+- Ready for developers to start building
+- Written in clean, simple English
