@@ -11,9 +11,6 @@ import {
   Menu,
   X,
   Zap,
-  Image,
-  Clapperboard,
-  ChevronDown,
   Share2,
   Shield,
 } from "lucide-react";
@@ -26,23 +23,13 @@ import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
 import WorkspaceSwitcher from "./workspace-switcher";
 
-type NavChild = { href: string; label: string; icon: any };
-type NavItem = { href: string; label: string; icon: any; children?: NavChild[]; expandWhenInactive?: boolean };
+type NavItem = { href: string; label: string; icon: any };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/brands", label: "Brands", icon: Building2 },
-  {
-    href: "/generate",
-    label: "Generate Post",
-    icon: Sparkles,
-    children: [
-      { href: "/generate?tab=image", label: "Post Image", icon: Image },
-      { href: "/generate?tab=video", label: "Video Script", icon: Clapperboard },
-    ],
-    expandWhenInactive: false,
-  },
+  { href: "/generate", label: "Generate Post", icon: Sparkles },
   { href: "/library", label: "Library", icon: Library },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
@@ -79,9 +66,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const visibleNavItems = me?.isSuperadmin ? [...navItems, adminNavItem] : navItems;
   const currentPlan = usage?.plan ?? "free";
 
-  // Check if we're on the generate page — keep sub-items visible
-  const onGeneratePage = location === "/generate" || location.startsWith("/generate");
-
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="px-4 py-5 border-b border-border">
@@ -94,57 +78,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {visibleNavItems.map(({ href, label, icon: Icon, children: subItems }) => {
-          const isActive = location === href || (location.startsWith(href + "?") || location.startsWith(href + "/"));
-          const hasChildren = subItems && subItems.length > 0;
-
+        {visibleNavItems.map(({ href, label, icon: Icon }) => {
+          const isActive = location === href || location.startsWith(href + "?") || location.startsWith(href + "/");
           return (
-            <div key={href}>
-              <Link
-                href={href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1">{label}</span>
-                {hasChildren && (
-                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", onGeneratePage && "rotate-180")} />
-                )}
-              </Link>
-
-              {/* Sub-items — shown when parent page is active */}
-              {hasChildren && onGeneratePage && (
-                <div className="ml-3 pl-4 border-l border-border mt-0.5 mb-1 space-y-0.5">
-                  {subItems.map(({ href: subHref, label: subLabel, icon: SubIcon }) => {
-                    // Determine if this sub-item tab is active via search param
-                    const tabParam = subHref.split("?tab=")[1];
-                    const currentSearch = typeof window !== "undefined" ? window.location.search : "";
-                    const subActive = currentSearch.includes(`tab=${tabParam}`);
-                    return (
-                      <Link
-                        key={subHref}
-                        href={subHref}
-                        onClick={() => setMobileOpen(false)}
-                        className={cn(
-                          "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                          subActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                        )}
-                      >
-                        <SubIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                        {subLabel}
-                      </Link>
-                    );
-                  })}
-                </div>
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
               )}
-            </div>
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{label}</span>
+            </Link>
           );
         })}
       </nav>
