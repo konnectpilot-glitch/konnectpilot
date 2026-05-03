@@ -251,7 +251,10 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-right tabular-nums">{u.brandCount}</td>
                       <td className="px-4 py-3 text-right tabular-nums">{u.postCount}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-xs text-muted-foreground">
-                        {u.captionUsed}c · {u.imageUsed}i
+                        {u.creditsUsed.toFixed(1)} cr
+                        {u.bonusCredits > 0 && (
+                          <span className="ml-1 text-primary">+{u.bonusCredits.toFixed(0)}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {u.lastActivityAt

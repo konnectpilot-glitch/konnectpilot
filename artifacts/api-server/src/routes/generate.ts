@@ -15,13 +15,18 @@ import { buildPerformanceMemoryContext } from "../lib/performance-memory";
 
 const router: IRouter = Router();
 
-function quotaExceededResponse(res: any, kind: "caption" | "image", used: number, limit: number, plan: string) {
+function quotaExceededResponse(
+  res: any,
+  result: { used: number; limit: number; bonus: number; cost: number },
+  plan: string,
+) {
   res.status(402).json({
-    error: `Monthly ${kind} quota reached (${used}/${limit}) on the ${plan} plan. Upgrade to keep generating.`,
+    error: `You're out of credits this month (${result.used.toFixed(1)} / ${result.limit} used, ${result.bonus.toFixed(1)} bonus). Top up or upgrade to keep generating.`,
     code: "quota_exceeded",
-    kind,
-    used,
-    limit,
+    used: result.used,
+    limit: result.limit,
+    bonus: result.bonus,
+    cost: result.cost,
     plan,
   });
 }
@@ -70,9 +75,10 @@ router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): P
   }
 
   const user = req.user;
-  const reservation = await reserveQuota(user.id, user.plan, "caption");
+  // Text-only caption generation = 0.5 credits per spec.
+  const reservation = await reserveQuota(user.id, user.plan, "caption", "text_post");
   if (!reservation.allowed) {
-    quotaExceededResponse(res, "caption", reservation.used, reservation.limit, user.plan);
+    quotaExceededResponse(res, reservation, user.plan);
     return;
   }
 
@@ -98,7 +104,7 @@ router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): P
       brandId: parsed.data.brandId,
     }));
   } catch (err) {
-    await releaseReservation(reservation.reservationId);
+    await releaseReservation(reservation.reservationId, reservation.usedBonus);
     throw err;
   }
 });
@@ -113,9 +119,10 @@ router.post("/generate/image", requireAuth, requireWorkspace, async (req: any, r
   }
 
   const user = req.user;
-  const imageReservation = await reserveQuota(user.id, user.plan, "image");
+  // AI image post (image + caption combo) = 1 credit per spec.
+  const imageReservation = await reserveQuota(user.id, user.plan, "image", "image_post");
   if (!imageReservation.allowed) {
-    quotaExceededResponse(res, "image", imageReservation.used, imageReservation.limit, user.plan);
+    quotaExceededResponse(res, imageReservation, user.plan);
     return;
   }
 
@@ -132,7 +139,7 @@ router.post("/generate/image", requireAuth, requireWorkspace, async (req: any, r
       .where(and(eq(brandsTable.id, Number(brandId)), eq(brandsTable.workspaceId, req.workspaceId)));
 
     if (!brand) {
-      await releaseReservation(imageReservation.reservationId);
+      await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
       res.status(404).json({ error: "Brand not found" });
       return;
     }
@@ -160,14 +167,14 @@ No text overlays. Clean composition with strong visual hierarchy.`;
     clearTimeout(timeout);
 
     if (!imgRes.ok) {
-      await releaseReservation(imageReservation.reservationId);
+      await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
       res.status(502).json({ error: "Image generation service returned an error. Please try again." });
       return;
     }
 
     const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
     if (!contentType.startsWith("image/")) {
-      await releaseReservation(imageReservation.reservationId);
+      await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
       res.status(502).json({ error: "Image generation service returned invalid content. Please try again." });
       return;
     }
@@ -178,7 +185,7 @@ No text overlays. Clean composition with strong visual hierarchy.`;
 
     res.json({ imageUrl: dataUrl, prompt: imagePrompt });
   } catch (err: any) {
-    await releaseReservation(imageReservation.reservationId);
+    await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
     const isTimeout = err?.name === "AbortError";
     res.status(isTimeout ? 504 : 500).json({
       error: isTimeout

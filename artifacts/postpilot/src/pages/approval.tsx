@@ -62,7 +62,7 @@ function PlatformIcon({ platform }: { platform: string }) {
 }
 
 const PLAN_BATCH_DAYS: Record<string, number> = {
-  free: 7, starter: 15, pro: 30, agency: 30, business: 30,
+  free: 7, starter: 15, pro: 30, agency: 30,
 };
 
 export default function ApprovalPage() {

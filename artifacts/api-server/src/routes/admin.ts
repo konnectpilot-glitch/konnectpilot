@@ -16,7 +16,7 @@ const PLAN_MRR_CENTS: Record<string, number> = {
   free: 0,
   starter: 1900,
   pro: 4900,
-  agency: 14900,
+  agency: 9900,
 };
 
 function startOfMonthUtc(): Date {
@@ -28,8 +28,7 @@ function serializeAdminUser(row: {
   user: typeof usersTable.$inferSelect;
   brandCount: number;
   postCount: number;
-  captionUsed: number;
-  imageUsed: number;
+  creditsUsed: number;
   lastActivityAt: Date | string | null;
 }) {
   const lastActivity =
@@ -55,8 +54,8 @@ function serializeAdminUser(row: {
     trialEndsAt: row.user.trialEndsAt?.toISOString() ?? null,
     brandCount: row.brandCount,
     postCount: row.postCount,
-    captionUsed: row.captionUsed,
-    imageUsed: row.imageUsed,
+    creditsUsed: row.creditsUsed,
+    bonusCredits: Number(row.user.bonusCredits ?? 0),
     mrrCents,
     lastActivityAt: lastActivity ? lastActivity.toISOString() : null,
     createdAt: row.user.createdAt.toISOString(),
@@ -79,23 +78,15 @@ async function loadSummary(userId: number) {
     .innerJoin(brandsTable, eq(brandsTable.id, postsTable.brandId))
     .where(eq(brandsTable.userId, userId));
   const since = startOfMonthUtc();
-  const usageRows = await db
-    .select({ kind: aiUsageTable.kind, n: sql<number>`count(*)::int` })
+  const [usage] = await db
+    .select({ total: sql<number>`coalesce(sum(${aiUsageTable.creditCost}), 0)::float` })
     .from(aiUsageTable)
-    .where(and(eq(aiUsageTable.userId, userId), gte(aiUsageTable.createdAt, since)))
-    .groupBy(aiUsageTable.kind);
-  let captionUsed = 0;
-  let imageUsed = 0;
-  for (const r of usageRows) {
-    if (r.kind === "image") imageUsed += Number(r.n);
-    else captionUsed += Number(r.n);
-  }
+    .where(and(eq(aiUsageTable.userId, userId), gte(aiUsageTable.createdAt, since)));
   return serializeAdminUser({
     user,
     brandCount: Number(brandCount) || 0,
     postCount: Number(postCount) || 0,
-    captionUsed,
-    imageUsed,
+    creditsUsed: Number(usage?.total ?? 0),
     lastActivityAt: lastActivityAt ?? null,
   });
 }
@@ -127,29 +118,20 @@ router.get("/admin/users", requireAuth, requireSuperadmin, async (_req, res): Pr
   const usageRows = await db
     .select({
       userId: aiUsageTable.userId,
-      kind: aiUsageTable.kind,
-      n: sql<number>`count(*)::int`,
+      total: sql<number>`coalesce(sum(${aiUsageTable.creditCost}), 0)::float`,
     })
     .from(aiUsageTable)
     .where(gte(aiUsageTable.createdAt, since))
-    .groupBy(aiUsageTable.userId, aiUsageTable.kind);
-  const usageByUser = new Map<number, { caption: number; image: number }>();
-  for (const r of usageRows) {
-    const cur = usageByUser.get(r.userId) ?? { caption: 0, image: 0 };
-    if (r.kind === "image") cur.image += Number(r.n);
-    else cur.caption += Number(r.n);
-    usageByUser.set(r.userId, cur);
-  }
+    .groupBy(aiUsageTable.userId);
+  const usageByUser = new Map(usageRows.map((r) => [r.userId, Number(r.total)]));
 
   const result = users.map((u) => {
-    const usage = usageByUser.get(u.id) ?? { caption: 0, image: 0 };
     const post = postByUser.get(u.id);
     return serializeAdminUser({
       user: u,
       brandCount: brandByUser.get(u.id) ?? 0,
       postCount: post?.n ?? 0,
-      captionUsed: usage.caption,
-      imageUsed: usage.image,
+      creditsUsed: usageByUser.get(u.id) ?? 0,
       lastActivityAt: post?.last ?? null,
     });
   });

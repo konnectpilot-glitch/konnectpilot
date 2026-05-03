@@ -6,6 +6,7 @@ import {
   usersTable,
   affiliateReferralsTable,
   affiliateCommissionsTable,
+  processedStripeEventsTable,
 } from "@workspace/db";
 import {
   commissionPeriodFor,
@@ -18,59 +19,60 @@ import {
   CreatePortalSessionResponse,
 } from "@workspace/api-zod";
 import { requireAuth, ensureUser } from "./users";
-import { logger } from "../lib/logger";
+import {
+  PLAN_CONFIG,
+  PLAN_ORDER,
+  TOP_UPS,
+  ADD_ONS,
+  type Plan,
+} from "../lib/plans";
+import { addBonusCredits } from "../lib/quotas";
 
 const router: IRouter = Router();
 
-const PLANS = [
-  {
-    id: "starter",
-    name: "Starter",
-    price: 19,
-    stripePriceId: process.env.STRIPE_STARTER_PRICE_ID ?? "",
-    features: [
-      "1 brand",
-      "4 platforms (Facebook, Instagram, LinkedIn, TikTok)",
-      "Daily AI-generated posts",
-      "Post history",
-      "Copy-to-clipboard",
-    ],
-    brandLimit: 1,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 49,
-    stripePriceId: process.env.STRIPE_PRO_PRICE_ID ?? "",
-    features: [
-      "5 brands",
-      "All platforms",
-      "Custom posting time",
-      "Basic analytics",
-      "Post history",
-      "Priority email support",
-    ],
-    brandLimit: 5,
-  },
-  {
-    id: "agency",
-    name: "Agency",
-    price: 99,
-    stripePriceId: process.env.STRIPE_AGENCY_PRICE_ID ?? "",
-    features: [
-      "Unlimited brands",
-      "All platforms",
-      "White-label reports",
-      "Priority support",
-      "Team access",
-      "Advanced analytics",
-    ],
-    brandLimit: null,
-  },
-];
+// Marketing list excludes "free" — that's the default tier for unsubscribed users.
+function publicPlans() {
+  return PLAN_ORDER.filter((id) => id !== "free").map((id) => {
+    const p = PLAN_CONFIG[id];
+    return {
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      stripePriceId: p.stripePriceId,
+      features: p.features,
+      brandLimit: p.brands,
+      socialAccountLimit: p.socialAccounts,
+      creditsLimit: p.credits,
+      daysAdvance: p.daysAdvance,
+      popular: p.popular ?? false,
+    };
+  });
+}
 
 router.get("/billing/plans", async (_req, res): Promise<void> => {
-  res.json(ListPlansResponse.parse(PLANS));
+  res.json(ListPlansResponse.parse(publicPlans()));
+});
+
+router.get("/billing/topups", async (_req, res): Promise<void> => {
+  res.json(
+    TOP_UPS.map((t) => ({
+      id: t.id,
+      credits: t.credits,
+      priceUsd: t.priceUsd,
+      configured: Boolean(t.stripePriceId),
+    })),
+  );
+});
+
+router.get("/billing/addons", async (_req, res): Promise<void> => {
+  res.json(
+    ADD_ONS.map((a) => ({
+      id: a.id,
+      name: a.name,
+      priceUsd: a.priceUsd,
+      configured: Boolean(a.stripePriceId),
+    })),
+  );
 });
 
 router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<void> => {
@@ -88,9 +90,14 @@ router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<voi
     return;
   }
 
-  const plan = PLANS.find(p => p.id === parsed.data.planId);
-  if (!plan) {
+  const planId = parsed.data.planId as Plan;
+  const plan = PLAN_CONFIG[planId];
+  if (!plan || planId === "free") {
     res.status(400).json({ error: "Invalid plan" });
+    return;
+  }
+  if (!plan.stripePriceId) {
+    res.status(500).json({ error: `Stripe price id for ${plan.name} is not configured` });
     return;
   }
 
@@ -111,12 +118,62 @@ router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<voi
     payment_method_types: ["card"],
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
     mode: "subscription",
+    subscription_data: { trial_period_days: 7 },
     success_url: parsed.data.successUrl,
     cancel_url: parsed.data.cancelUrl,
-    metadata: { userId: String(user.id), planId: plan.id },
+    metadata: { userId: String(user.id), planId: plan.id, kind: "subscription" },
   });
 
   res.json(CreateCheckoutSessionResponse.parse({ url: session.url ?? "" }));
+});
+
+// One-time credit top-up checkout. Body: { topupId, successUrl, cancelUrl }
+router.post("/billing/topup", requireAuth, async (req: any, res): Promise<void> => {
+  const user = await ensureUser(req.clerkUserId, req.clerkEmail);
+  const { topupId, successUrl, cancelUrl } = req.body ?? {};
+  const topup = TOP_UPS.find((t) => t.id === topupId);
+  if (!topup) {
+    res.status(400).json({ error: "Invalid top-up id" });
+    return;
+  }
+  if (!topup.stripePriceId) {
+    res.status(500).json({ error: `Stripe price id for top-up ${topup.id} is not configured` });
+    return;
+  }
+  if (typeof successUrl !== "string" || typeof cancelUrl !== "string") {
+    res.status(400).json({ error: "successUrl and cancelUrl required" });
+    return;
+  }
+  const stripeSecret = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecret) {
+    res.status(500).json({ error: "Payment service not configured" });
+    return;
+  }
+  const stripe = new Stripe(stripeSecret);
+  let customerId = user.stripeCustomerId;
+  if (!customerId) {
+    const c = await stripe.customers.create({
+      email: user.email,
+      metadata: { userId: String(user.id), clerkId: user.clerkId },
+    });
+    customerId = c.id;
+    await db.update(usersTable).set({ stripeCustomerId: customerId }).where(eq(usersTable.id, user.id));
+  }
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    mode: "payment",
+    payment_method_types: ["card"],
+    line_items: [{ price: topup.stripePriceId, quantity: 1 }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: {
+      userId: String(user.id),
+      kind: "topup",
+      topupId: topup.id,
+      credits: String(topup.credits),
+    },
+  });
+  res.json({ url: session.url ?? "" });
 });
 
 router.post("/billing/portal", requireAuth, async (req: any, res): Promise<void> => {
@@ -167,38 +224,74 @@ router.post("/billing/webhooks", async (req: any, res): Promise<void> => {
       return;
     }
   } else {
+    // In production we MUST refuse unsigned webhooks — accepting them would
+    // let an attacker mint subscriptions or top-up credits via forged JSON.
+    if (process.env.NODE_ENV === "production") {
+      req.log.error("STRIPE_WEBHOOK_SECRET is not set in production; rejecting webhook");
+      res.status(500).json({ error: "Webhook secret not configured" });
+      return;
+    }
     event = req.body;
   }
 
-  const PLAN_MAP: Record<string, string> = {
-    [process.env.STRIPE_STARTER_PRICE_ID ?? ""]: "starter",
-    [process.env.STRIPE_PRO_PRICE_ID ?? ""]: "pro",
-    [process.env.STRIPE_AGENCY_PRICE_ID ?? ""]: "agency",
-  };
+  // Idempotency: Stripe retries deliveries; the unique PK on event_id makes
+  // duplicate processing a no-op (insert fails with 23505).
+  try {
+    await db.insert(processedStripeEventsTable).values({
+      eventId: event.id,
+      type: event.type,
+    });
+  } catch (err: unknown) {
+    const pgCode = (err as { code?: string } | null)?.code;
+    if (pgCode === "23505") {
+      req.log.info({ eventId: event.id, type: event.type }, "Skipped duplicate Stripe webhook");
+      res.json({ status: "duplicate" });
+      return;
+    }
+    throw err;
+  }
+
+  // Map Stripe price ids back to our plan ids for subscription updates.
+  const PLAN_MAP: Record<string, Plan> = {};
+  for (const id of PLAN_ORDER) {
+    const sp = PLAN_CONFIG[id].stripePriceId;
+    if (sp) PLAN_MAP[sp] = id;
+  }
 
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = Number(session.metadata?.userId);
-      const planId = session.metadata?.planId ?? "starter";
-      if (userId) {
-        await db.update(usersTable).set({
-          plan: planId,
-          stripeSubscriptionId: session.subscription as string,
-          subscriptionStatus: "active",
-        }).where(eq(usersTable.id, userId));
+      const kind = session.metadata?.kind;
 
-        // Mark affiliate referral as converted on first paid checkout.
-        const [ref] = await db
-          .select()
-          .from(affiliateReferralsTable)
-          .where(eq(affiliateReferralsTable.referredUserId, userId));
-        if (ref && !ref.convertedAt) {
-          await db
-            .update(affiliateReferralsTable)
-            .set({ convertedAt: new Date(), status: "converted" })
-            .where(eq(affiliateReferralsTable.id, ref.id));
+      if (!userId) break;
+
+      if (kind === "topup") {
+        const credits = Number(session.metadata?.credits ?? 0);
+        if (credits > 0) {
+          await addBonusCredits(userId, credits);
+          req.log.info({ userId, credits, sessionId: session.id }, "Top-up credited");
         }
+        break;
+      }
+
+      // Subscription checkout — assign plan + mark referral as converted.
+      const planId = (session.metadata?.planId ?? "starter") as Plan;
+      await db.update(usersTable).set({
+        plan: planId,
+        stripeSubscriptionId: session.subscription as string,
+        subscriptionStatus: "active",
+      }).where(eq(usersTable.id, userId));
+
+      const [ref] = await db
+        .select()
+        .from(affiliateReferralsTable)
+        .where(eq(affiliateReferralsTable.referredUserId, userId));
+      if (ref && !ref.convertedAt) {
+        await db
+          .update(affiliateReferralsTable)
+          .set({ convertedAt: new Date(), status: "converted" })
+          .where(eq(affiliateReferralsTable.id, ref.id));
       }
       break;
     }
@@ -245,10 +338,6 @@ router.post("/billing/webhooks", async (req: any, res): Promise<void> => {
           "Affiliate commission recorded",
         );
       } catch (err: unknown) {
-        // Suppress only Postgres unique-constraint violations (code 23505),
-        // which happen when Stripe re-delivers the same invoice webhook.
-        // Any other error must propagate so Stripe can retry the webhook
-        // and we don't silently drop real commission revenue.
         const pgCode = (err as { code?: string } | null)?.code;
         if (pgCode === "23505") {
           req.log.info(

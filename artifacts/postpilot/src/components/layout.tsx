@@ -50,7 +50,6 @@ function PlanBadge({ plan }: { plan: string }) {
     free: "bg-secondary text-muted-foreground",
     starter: "bg-blue-50 text-blue-700",
     pro: "bg-purple-50 text-purple-700",
-    business: "bg-amber-50 text-amber-700",
     agency: "bg-amber-50 text-amber-700",
   };
   const label = plan === "free" ? "Free plan" : `${plan} plan`;

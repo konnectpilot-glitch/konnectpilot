@@ -19,17 +19,13 @@ import { buildBrandMemoryContext, aiBrandReview, recordFeedback } from "../lib/b
 import { buildPerformanceMemoryContext } from "../lib/performance-memory";
 import { retryPost } from "../lib/scheduler";
 import { logger } from "../lib/logger";
+import { getPlan } from "../lib/plans";
 
 const router: IRouter = Router();
 
-// Plan-tier batch limits (days that can be pre-generated into the queue).
-const PLAN_BATCH_DAYS: Record<string, number> = {
-  free: 7,
-  starter: 15,
-  pro: 30,
-  agency: 30,
-  business: 30,
-};
+function maxAdvanceMs(plan: string): number {
+  return getPlan(plan).daysAdvance * 24 * 60 * 60 * 1000;
+}
 
 function buildCaptionPrompt(brand: any, platform: string, topic: string | null, brandMemory: string) {
   const platformInstructions: Record<string, string> = {
@@ -80,10 +76,11 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
   }
 
   const { brandId, days, platforms, startDate } = parsed.data;
-  const planDays = PLAN_BATCH_DAYS[req.user.plan] ?? 7;
+  const planDays = getPlan(req.user.plan).daysAdvance;
   if (days > planDays) {
     res.status(402).json({
-      error: `Your ${req.user.plan} plan allows up to ${planDays} days of batch generation. Requested ${days}.`,
+      error: `Your ${req.user.plan} plan allows up to ${planDays} days of advance generation. Requested ${days}.`,
+      code: "days_advance_exceeded",
     });
     return;
   }
@@ -112,8 +109,8 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
   for (let day = 0; day < days; day++) {
     for (const platform of platforms) {
       const slotTime = nextSlotTime(start, brand.postTime, day);
-      // Reserve a caption quota for each generation.
-      const reservation = await reserveQuota(req.user.id, req.user.plan, "caption");
+      // Each batch caption costs 0.5 credits (text-only post).
+      const reservation = await reserveQuota(req.user.id, req.user.plan, "caption", "text_post");
       if (!reservation.allowed) {
         failed++;
         continue;
@@ -128,7 +125,7 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
         content = completion.choices[0]?.message?.content ?? "";
         await setReservationTokens(reservation.reservationId, completion.usage?.total_tokens);
       } catch (err: any) {
-        await releaseReservation(reservation.reservationId);
+        await releaseReservation(reservation.reservationId, reservation.usedBonus);
         logger.warn({ err: err?.message, brandId, platform }, "Batch caption gen failed");
         failed++;
         continue;
@@ -230,7 +227,19 @@ router.patch("/approval/posts/:id", requireAuth, requireWorkspace, async (req: a
   }
   if (body.data.imageUrl !== undefined) updates.imageUrl = body.data.imageUrl;
   if (body.data.scheduledFor !== undefined) {
-    updates.scheduledFor = body.data.scheduledFor ? new Date(body.data.scheduledFor) : null;
+    if (body.data.scheduledFor) {
+      const when = new Date(body.data.scheduledFor);
+      if (when.getTime() - Date.now() > maxAdvanceMs(req.user.plan)) {
+        res.status(402).json({
+          error: `Your ${req.user.plan} plan limits scheduling to ${getPlan(req.user.plan).daysAdvance} days ahead.`,
+          code: "days_advance_exceeded",
+        });
+        return;
+      }
+      updates.scheduledFor = when;
+    } else {
+      updates.scheduledFor = null;
+    }
   }
 
   const [updated] = await db
@@ -345,9 +354,17 @@ router.post("/approval/bulk", requireAuth, requireWorkspace, async (req: any, re
           skipped.push({ id, reason: "scheduledFor required" });
           continue;
         }
+        const when = new Date(scheduledFor);
+        if (when.getTime() - Date.now() > maxAdvanceMs(req.user.plan)) {
+          skipped.push({
+            id,
+            reason: `Beyond ${getPlan(req.user.plan).daysAdvance}-day advance limit for ${req.user.plan} plan`,
+          });
+          continue;
+        }
         await db
           .update(postsTable)
-          .set({ scheduledFor: new Date(scheduledFor) })
+          .set({ scheduledFor: when })
           .where(eq(postsTable.id, id));
         succeeded.push(id);
       }

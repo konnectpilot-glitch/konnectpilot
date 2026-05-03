@@ -5,8 +5,44 @@ import { db, socialAccountsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireWorkspace, ensureUser, hasRoleAtLeast } from "./users";
 import { workspacesTable, workspaceMembersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { getPlan } from "../lib/plans";
 
 const router: IRouter = Router();
+
+async function assertSocialAccountQuota(req: any, res: any): Promise<boolean> {
+  const limit = getPlan(req.user.plan).socialAccounts;
+  const existing = await db
+    .select({ id: socialAccountsTable.id })
+    .from(socialAccountsTable)
+    .where(eq(socialAccountsTable.workspaceId, req.workspaceId));
+  if (existing.length >= limit) {
+    res.status(403).json({
+      error: `Your plan allows a maximum of ${limit} connected account(s). Please upgrade.`,
+      code: "social_account_limit_reached",
+    });
+    return false;
+  }
+  return true;
+}
+
+// Used from the OAuth callback (no req.workspaceId / no res.json envelope).
+async function assertSocialAccountQuotaForCallback(
+  userId: number,
+  plan: string,
+  workspaceId: number | null,
+): Promise<{ ok: boolean; limit: number }> {
+  const limit = getPlan(plan).socialAccounts;
+  const rows = workspaceId
+    ? await db
+        .select({ id: socialAccountsTable.id })
+        .from(socialAccountsTable)
+        .where(eq(socialAccountsTable.workspaceId, workspaceId))
+    : await db
+        .select({ id: socialAccountsTable.id })
+        .from(socialAccountsTable)
+        .where(eq(socialAccountsTable.userId, userId));
+  return { ok: rows.length < limit, limit };
+}
 
 const STATE_SECRET = process.env.SESSION_SECRET ?? "dev-state-secret-change-me";
 
@@ -225,7 +261,12 @@ function getRedirectUri(req: any, platform: string): string {
   return `${getAppUrl(req)}/api/social-accounts/callback/${platform}`;
 }
 
-router.post("/social-accounts/connect", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+async function connectHandler(req: any, res: any): Promise<void> {
+  if (!(await assertSocialAccountQuota(req, res))) return;
+  return connectHandlerImpl(req, res);
+}
+router.post("/social-accounts/connect", requireAuth, requireWorkspace, connectHandler);
+async function connectHandlerImpl(req: any, res: any): Promise<void> {
   if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
     res.status(403).json({ error: "Admin role required" });
     return;
@@ -244,7 +285,7 @@ router.post("/social-accounts/connect", requireAuth, requireWorkspace, async (re
   const state = signState({ platform, clerkUserId: req.clerkUserId, workspaceId: req.workspaceId, ts: Date.now() });
   const redirectUri = getRedirectUri(req, platform);
   res.json({ url: config.authUrl(redirectUri, state) });
-});
+}
 
 router.get("/social-accounts/callback/:platform", async (req, res): Promise<void> => {
   const platform = req.params.platform;
@@ -333,6 +374,14 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
         })
         .where(eq(socialAccountsTable.id, existing.id));
     } else {
+      // Re-check the social-account cap at insert time. The cap is enforced
+      // on /connect, but a user could initiate several OAuth flows in
+      // parallel under the cap and have all of them complete after.
+      const cap = await assertSocialAccountQuotaForCallback(user.id, user.plan, targetWsId);
+      if (!cap.ok) {
+        res.redirect(`${redirectBase}?error=limit_reached&platform=${platform}`);
+        return;
+      }
       await db.insert(socialAccountsTable).values({
         userId: user.id,
         workspaceId: targetWsId,
@@ -360,6 +409,7 @@ router.post("/social-accounts/manual-connect", requireAuth, requireWorkspace, as
     res.status(403).json({ error: "Admin role required" });
     return;
   }
+  if (!(await assertSocialAccountQuota(req, res))) return;
   const { platform, accountName, accountHandle } = req.body ?? {};
 
   if (!platform || typeof platform !== "string" || !PLATFORMS[platform]) {

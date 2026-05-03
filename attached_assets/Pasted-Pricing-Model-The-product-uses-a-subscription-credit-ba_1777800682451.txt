@@ -1,0 +1,154 @@
+Pricing Model
+
+The product uses a subscription + credit-based pricing model.
+
+* Users pay a monthly subscription fee based on their selected plan
+* Each plan includes a fixed number of monthly AI credits
+* Credits are consumed only for AI content generation
+* Scheduling, publishing, approval workflow, and connected platform posting do not consume credits
+
+Credit Rules
+
+* 1 AI image post + caption = 1 credit
+* 1 text-only post = 0.5 credit
+* Regenerate image or caption = 0.5 credit
+* 1 AI blog article = configurable, recommended 4 credits
+* Scheduling and publishing = free
+
+Supported Platforms in All Plans
+
+* Facebook
+* Instagram
+* LinkedIn
+
+Approval Modes in All Plans
+
+All plans must include both:
+
+* Auto Approval Mode
+* Manual Approval Mode
+
+⸻
+
+Plan 1: Starter
+
+Price: $19/month
+
+Target User: Individuals and small businesses
+
+Included Features:
+
+* 1 brand
+* Up to 3 connected social accounts total
+* 120 credits per month
+* Facebook, Instagram, and LinkedIn support
+* Auto approval mode
+* Manual approval mode
+* Up to 15 days of advance post generation
+* Basic scheduling
+* Basic post history
+* Basic analytics
+* 7-day free trial
+
+Usage Guidance:
+
+* Suitable for users managing one brand with light to moderate monthly posting needs
+
+⸻
+
+Plan 2: Pro
+
+Price: $49/month
+
+Target User: Growing businesses and serious marketers
+
+Included Features:
+
+* 5 brands
+* Up to 15 connected social accounts total
+* 400 credits per month
+* Facebook, Instagram, and LinkedIn support
+* Auto approval mode
+* Manual approval mode
+* Up to 30 days of advance post generation
+* Approval queue
+* Bulk approve / bulk reject / bulk reschedule
+* Brand-based filtering
+* AI brand memory
+* Analytics dashboard
+* 7-day free trial
+
+Usage Guidance:
+
+* Suitable for businesses managing multiple brands and requiring stronger automation, filtering, and approval workflows
+
+⸻
+
+Plan 3: Agency
+
+Price: $99/month
+
+Target User: Agencies and teams managing multiple client brands
+
+Included Features:
+
+* 10 brands
+* Up to 30 connected social accounts total
+* 1000 credits per month
+* Facebook, Instagram, and LinkedIn support
+* Auto approval mode
+* Manual approval mode
+* Up to 30 days of advance post generation
+* Advanced approval queue
+* Bulk actions
+* Advanced brand separation
+* Team access
+* Advanced analytics
+* Priority support
+* 7-day free trial
+
+Usage Guidance:
+
+* Suitable for agencies, multi-brand operators, and teams handling larger content volumes
+
+⸻
+
+Add-Ons
+
+Credit Top-Ups
+
+* 100 credits = $9
+* 250 credits = $19
+* 500 credits = $35
+
+Optional Add-Ons
+
+* Extra brand = $5/month
+* Extra team member = $5/month
+
+⸻
+
+Pricing Rules & Constraints
+
+* Do not offer unlimited brands
+* Do not offer unlimited connected accounts
+* All plan limits must be enforced at system level
+* Credits reset monthly unless rollover is enabled later
+* Trial access must be time-limited to 7 days
+* Trial users may receive reduced credits if needed for abuse prevention
+
+⸻
+
+Packaging UX Requirements
+
+* Pricing page must clearly show:
+    * monthly price
+    * included credits
+    * number of brands
+    * number of connected accounts
+    * Auto + Manual approval mode in every plan
+    * supported platforms
+    * 7-day free trial
+* Include a short explanation of how credits work
+* Show top-up options clearly inside billing page and pricing page
+* Highlight Pro as the recommended or most popular plan

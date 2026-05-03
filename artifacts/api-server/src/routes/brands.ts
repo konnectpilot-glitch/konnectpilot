@@ -11,15 +11,9 @@ import {
   DeleteBrandParams,
 } from "@workspace/api-zod";
 import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
+import { getPlan } from "../lib/plans";
 
 const router: IRouter = Router();
-
-const PLAN_BRAND_LIMITS: Record<string, number | null> = {
-  free: 1,
-  starter: 1,
-  pro: 5,
-  agency: null, // unlimited
-};
 
 router.get("/brands", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const brands = await db
@@ -45,14 +39,19 @@ router.post("/brands", requireAuth, requireWorkspace, async (req: any, res): Pro
     return;
   }
 
-  // Plan limits scoped per workspace
-  const limit = PLAN_BRAND_LIMITS[req.user.plan] ?? null;
-  if (limit !== null) {
-    const existing = await db.select().from(brandsTable).where(eq(brandsTable.workspaceId, req.workspaceId));
-    if (existing.length >= limit) {
-      res.status(403).json({ error: `Your plan allows a maximum of ${limit} brand(s). Please upgrade.` });
-      return;
-    }
+  // Plan limits scoped per workspace, plus add-on extra brands purchased.
+  const planLimit = getPlan(req.user.plan).brands;
+  const limit = planLimit + (req.user.extraBrands ?? 0);
+  const existing = await db
+    .select({ id: brandsTable.id })
+    .from(brandsTable)
+    .where(eq(brandsTable.workspaceId, req.workspaceId));
+  if (existing.length >= limit) {
+    res.status(403).json({
+      error: `Your plan allows a maximum of ${limit} brand(s). Upgrade or add an extra brand from billing.`,
+      code: "brand_limit_reached",
+    });
+    return;
   }
 
   const [brand] = await db

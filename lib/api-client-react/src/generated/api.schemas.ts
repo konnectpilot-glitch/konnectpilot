@@ -440,8 +440,11 @@ export interface Plan {
   price: number;
   stripePriceId?: string;
   features: string[];
-  /** @nullable */
-  brandLimit?: number | null;
+  brandLimit: number;
+  socialAccountLimit: number;
+  creditsLimit: number;
+  daysAdvance: number;
+  popular?: boolean;
 }
 
 export interface CreateCheckoutBody {
@@ -476,12 +479,12 @@ export interface PlatformStat {
 
 export interface UsageStats {
   plan: string;
-  captionUsed: number;
-  /** @nullable */
-  captionLimit?: number | null;
-  imageUsed: number;
-  /** @nullable */
-  imageLimit?: number | null;
+  creditsUsed: number;
+  creditsLimit: number;
+  bonusCredits: number;
+  brandLimit: number;
+  socialAccountLimit: number;
+  daysAdvance: number;
   periodStart: string;
 }
 
@@ -499,8 +502,8 @@ export interface AdminUserSummary {
   trialEndsAt?: string | null;
   brandCount: number;
   postCount: number;
-  captionUsed: number;
-  imageUsed: number;
+  creditsUsed: number;
+  bonusCredits: number;
   mrrCents: number;
   /** @nullable */
   lastActivityAt?: string | null;

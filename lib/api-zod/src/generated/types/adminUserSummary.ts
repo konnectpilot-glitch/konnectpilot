@@ -20,8 +20,8 @@ export interface AdminUserSummary {
   trialEndsAt?: string | null;
   brandCount: number;
   postCount: number;
-  captionUsed: number;
-  imageUsed: number;
+  creditsUsed: number;
+  bonusCredits: number;
   mrrCents: number;
   /** @nullable */
   lastActivityAt?: string | null;

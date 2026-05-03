@@ -1,139 +1,146 @@
-import { and, eq, gte, sql, inArray } from "drizzle-orm";
-import { db, aiUsageTable } from "@workspace/db";
+import { and, eq, gte, sql } from "drizzle-orm";
+import { db, aiUsageTable, usersTable } from "@workspace/db";
 import type { AiUsageKind } from "@workspace/db";
+import { getPlan, CREDIT_COST, type CreditOp } from "./plans";
+
+// Stable hash from a numeric user id to a 32-bit signed int suitable for
+// pg_advisory_xact_lock. user.id is already an int32 so we can pass it
+// directly, but the cast guards future migrations to bigint.
+function userLockKey(userId: number): number {
+  return userId | 0;
+}
 
 export type Plan = "free" | "starter" | "pro" | "agency";
-
-type Limits = { caption: number | null; image: number | null };
-
-const PLAN_LIMITS: Record<Plan, Limits> = {
-  free: { caption: 10, image: 5 },
-  starter: { caption: 100, image: 50 },
-  pro: { caption: 500, image: 250 },
-  agency: { caption: null, image: null },
-};
-
-function quotaKey(kind: AiUsageKind): "caption" | "image" {
-  return kind === "image" ? "image" : "caption";
-}
 
 function startOfMonthUtc(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
-export function getPlanLimits(plan: string): Limits {
-  return PLAN_LIMITS[(plan as Plan) in PLAN_LIMITS ? (plan as Plan) : "free"];
+export function getPlanCreditLimit(plan: string): number {
+  return getPlan(plan).credits;
 }
 
-export async function getUsageThisMonth(userId: number): Promise<{ caption: number; image: number }> {
+export async function getCreditsUsedThisMonth(userId: number): Promise<number> {
   const since = startOfMonthUtc();
-  const rows = await db
+  const [row] = await db
     .select({
-      kind: aiUsageTable.kind,
-      n: sql<number>`count(*)::int`,
+      total: sql<number>`coalesce(sum(${aiUsageTable.creditCost}), 0)::float`,
     })
     .from(aiUsageTable)
-    .where(and(eq(aiUsageTable.userId, userId), gte(aiUsageTable.createdAt, since)))
-    .groupBy(aiUsageTable.kind);
-
-  let caption = 0;
-  let image = 0;
-  for (const r of rows) {
-    const bucket = quotaKey(r.kind as AiUsageKind);
-    if (bucket === "caption") caption += Number(r.n);
-    else image += Number(r.n);
-  }
-  return { caption, image };
+    .where(and(eq(aiUsageTable.userId, userId), gte(aiUsageTable.createdAt, since)));
+  return Number(row?.total ?? 0);
 }
 
-export async function checkQuota(
-  userId: number,
-  plan: string,
-  kind: AiUsageKind,
-): Promise<{ allowed: boolean; used: number; limit: number | null; bucket: "caption" | "image" }> {
-  const limits = getPlanLimits(plan);
-  const bucket = quotaKey(kind);
-  const limit = limits[bucket];
-  if (limit === null) {
-    return { allowed: true, used: 0, limit: null, bucket };
-  }
-  const usage = await getUsageThisMonth(userId);
-  const used = usage[bucket];
-  return { allowed: used < limit, used, limit, bucket };
-}
-
-export async function recordUsage(
-  userId: number,
-  kind: AiUsageKind,
-  tokensUsed?: number,
-): Promise<void> {
-  await db.insert(aiUsageTable).values({ userId, kind, tokensUsed: tokensUsed ?? null });
+export async function getBonusCredits(userId: number): Promise<number> {
+  const [u] = await db
+    .select({ bonus: usersTable.bonusCredits })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+  return Number(u?.bonus ?? 0);
 }
 
 /**
- * Atomically reserve a quota slot by inserting a usage row only if the user is
- * still under their monthly limit. Returns the inserted row id on success, or
- * { allowed: false, used, limit } if the limit is reached. If the caller's
- * downstream AI call fails, they should call `releaseReservation(id)` to roll
- * back. This eliminates the race between checkQuota + recordUsage.
+ * Atomically reserve credits by inserting a usage row only if the user still
+ * has either monthly allocation OR top-up balance to cover the cost. Returns
+ * the inserted row id on success, or { allowed: false, ... } if exhausted.
+ *
+ * Bonus (top-up) credits are debited from `users.bonus_credits` BEFORE
+ * inserting the usage row, but only if the monthly allocation is short by the
+ * full cost. Partial coverage is not supported per the spec — each operation
+ * is charged as a single atomic unit.
+ *
+ * On AI failure the caller must call `releaseReservation(id)` which also
+ * refunds the bonus credit if one was used.
  */
 export async function reserveQuota(
   userId: number,
   plan: string,
   kind: AiUsageKind,
+  op: CreditOp = kind === "image" ? "image_post" : kind === "blog" ? "blog" : "text_post",
 ): Promise<
-  | { allowed: true; reservationId: number; bucket: "caption" | "image" }
-  | { allowed: false; used: number; limit: number; bucket: "caption" | "image" }
+  | { allowed: true; reservationId: number; cost: number; usedBonus: boolean }
+  | { allowed: false; used: number; limit: number; bonus: number; cost: number }
 > {
-  const limits = getPlanLimits(plan);
-  const bucket = quotaKey(kind);
-  const limit = limits[bucket];
+  const cost = CREDIT_COST[op];
+  const limit = getPlanCreditLimit(plan);
   const since = startOfMonthUtc();
 
-  if (limit === null) {
-    const [row] = await db
-      .insert(aiUsageTable)
-      .values({ userId, kind })
-      .returning({ id: aiUsageTable.id });
-    return { allowed: true, reservationId: row.id, bucket };
-  }
+  // Serialize per-user credit accounting via pg_advisory_xact_lock so two
+  // concurrent generations cannot both pass the limit check and overspend.
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${userLockKey(userId)})`);
 
-  const bucketKinds: AiUsageKind[] = bucket === "image" ? ["image"] : ["caption", "video_script"];
+    const usedRows = await tx.execute<{ total: number }>(sql`
+      SELECT COALESCE(SUM(credit_cost), 0)::float AS total
+      FROM ai_usage
+      WHERE user_id = ${userId} AND created_at >= ${since}
+    `);
+    const monthlyUsed = Number(usedRows.rows[0]?.total ?? 0);
 
-  const inserted = await db.execute<{ id: number }>(sql`
-    INSERT INTO ai_usage (user_id, kind, tokens_used)
-    SELECT ${userId}, ${kind}, NULL
-    WHERE (
-      SELECT COUNT(*) FROM ai_usage
-      WHERE user_id = ${userId}
-        AND kind IN (${sql.join(bucketKinds.map((k) => sql`${k}`), sql`, `)})
-        AND created_at >= ${since}
-    ) < ${limit}
-    RETURNING id
-  `);
+    // Prefer monthly allocation, fall back to bonus credits.
+    if (monthlyUsed + cost <= limit) {
+      const inserted = await tx
+        .insert(aiUsageTable)
+        .values({ userId, kind, creditCost: cost })
+        .returning({ id: aiUsageTable.id });
+      return {
+        allowed: true as const,
+        reservationId: inserted[0].id,
+        cost,
+        usedBonus: false,
+      };
+    }
 
-  const firstRow = inserted.rows[0];
-  if (firstRow) {
-    return { allowed: true, reservationId: Number(firstRow.id), bucket };
-  }
+    const debit = await tx.execute<{ id: number }>(sql`
+      UPDATE users
+      SET bonus_credits = bonus_credits - ${cost}
+      WHERE id = ${userId} AND bonus_credits >= ${cost}
+      RETURNING id
+    `);
+    if (debit.rows[0]) {
+      const inserted = await tx
+        .insert(aiUsageTable)
+        .values({ userId, kind, creditCost: cost })
+        .returning({ id: aiUsageTable.id });
+      return {
+        allowed: true as const,
+        reservationId: inserted[0].id,
+        cost,
+        usedBonus: true,
+      };
+    }
 
-  const [{ used }] = await db
-    .select({ used: sql<number>`count(*)::int` })
-    .from(aiUsageTable)
-    .where(
-      and(
-        eq(aiUsageTable.userId, userId),
-        inArray(aiUsageTable.kind, bucketKinds),
-        gte(aiUsageTable.createdAt, since),
-      ),
-    );
-
-  return { allowed: false, used: Number(used), limit, bucket };
+    const [u] = await tx
+      .select({ bonus: usersTable.bonusCredits })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    return {
+      allowed: false as const,
+      used: monthlyUsed,
+      limit,
+      bonus: Number(u?.bonus ?? 0),
+      cost,
+    };
+  });
 }
 
-export async function releaseReservation(reservationId: number): Promise<void> {
+export async function releaseReservation(
+  reservationId: number,
+  refundBonus = false,
+): Promise<void> {
+  // Fetch first to know the cost in case we need to refund a bonus debit.
+  const [row] = await db
+    .select({ userId: aiUsageTable.userId, cost: aiUsageTable.creditCost })
+    .from(aiUsageTable)
+    .where(eq(aiUsageTable.id, reservationId));
   await db.delete(aiUsageTable).where(eq(aiUsageTable.id, reservationId));
+  if (refundBonus && row) {
+    await db.execute(sql`
+      UPDATE users SET bonus_credits = bonus_credits + ${row.cost}
+      WHERE id = ${row.userId}
+    `);
+  }
 }
 
 export async function setReservationTokens(
@@ -145,4 +152,11 @@ export async function setReservationTokens(
     .update(aiUsageTable)
     .set({ tokensUsed })
     .where(eq(aiUsageTable.id, reservationId));
+}
+
+export async function addBonusCredits(userId: number, amount: number): Promise<void> {
+  if (amount <= 0) return;
+  await db.execute(sql`
+    UPDATE users SET bonus_credits = bonus_credits + ${amount} WHERE id = ${userId}
+  `);
 }

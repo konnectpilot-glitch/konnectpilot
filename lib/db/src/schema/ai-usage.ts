@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, real, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const aiUsageTable = pgTable(
@@ -10,6 +10,9 @@ export const aiUsageTable = pgTable(
       .references(() => usersTable.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
     tokensUsed: integer("tokens_used"),
+    // Credits charged for this generation (fractional).
+    // 0.5 = text-only post / regeneration, 1 = image post, 4 = blog article.
+    creditCost: real("credit_cost").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -18,4 +21,4 @@ export const aiUsageTable = pgTable(
 );
 
 export type AiUsage = typeof aiUsageTable.$inferSelect;
-export type AiUsageKind = "caption" | "image" | "video_script";
+export type AiUsageKind = "caption" | "image" | "video_script" | "blog";

@@ -8,11 +8,11 @@
 
 export interface UsageStats {
   plan: string;
-  captionUsed: number;
-  /** @nullable */
-  captionLimit?: number | null;
-  imageUsed: number;
-  /** @nullable */
-  imageLimit?: number | null;
+  creditsUsed: number;
+  creditsLimit: number;
+  bonusCredits: number;
+  brandLimit: number;
+  socialAccountLimit: number;
+  daysAdvance: number;
   periodStart: string;
 }

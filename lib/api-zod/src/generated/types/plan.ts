@@ -12,6 +12,9 @@ export interface Plan {
   price: number;
   stripePriceId?: string;
   features: string[];
-  /** @nullable */
-  brandLimit?: number | null;
+  brandLimit: number;
+  socialAccountLimit: number;
+  creditsLimit: number;
+  daysAdvance: number;
+  popular?: boolean;
 }

@@ -1684,12 +1684,24 @@ components:
           items:
             type: string
         brandLimit:
-          type: ["integer", "null"]
+          type: integer
+        socialAccountLimit:
+          type: integer
+        creditsLimit:
+          type: integer
+        daysAdvance:
+          type: integer
+        popular:
+          type: boolean
       required:
         - id
         - name
         - price
         - features
+        - brandLimit
+        - socialAccountLimit
+        - creditsLimit
+        - daysAdvance
 
     CreateCheckoutBody:
       type: object
@@ -1766,20 +1778,28 @@ components:
       properties:
         plan:
           type: string
-        captionUsed:
+        creditsUsed:
+          type: number
+        creditsLimit:
+          type: number
+        bonusCredits:
+          type: number
+        brandLimit:
           type: integer
-        captionLimit:
-          type: ["integer", "null"]
-        imageUsed:
+        socialAccountLimit:
           type: integer
-        imageLimit:
-          type: ["integer", "null"]
+        daysAdvance:
+          type: integer
         periodStart:
           type: string
       required:
         - plan
-        - captionUsed
-        - imageUsed
+        - creditsUsed
+        - creditsLimit
+        - bonusCredits
+        - brandLimit
+        - socialAccountLimit
+        - daysAdvance
         - periodStart
 
     AdminUserSummary:
@@ -1805,10 +1825,10 @@ components:
           type: integer
         postCount:
           type: integer
-        captionUsed:
-          type: integer
-        imageUsed:
-          type: integer
+        creditsUsed:
+          type: number
+        bonusCredits:
+          type: number
         mrrCents:
           type: integer
         lastActivityAt:
@@ -1823,8 +1843,8 @@ components:
         - isSuperadmin
         - brandCount
         - postCount
-        - captionUsed
-        - imageUsed
+        - creditsUsed
+        - bonusCredits
         - mrrCents
         - createdAt
 
