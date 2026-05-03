@@ -184,10 +184,13 @@ export const analyticsReportsTable = pgTable(
     summary: jsonb("summary").$type<Record<string, unknown>>().notNull(),
     html: text("html"),
     emailOptIn: boolean("email_opt_in").notNull().default(false),
+    lastEmailedAt: timestamp("last_emailed_at", { withTimezone: true }),
+    emailRecipients: jsonb("email_recipients").$type<string[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     brandIdx: index("reports_brand_idx").on(t.brandId, t.createdAt),
+    brandPeriodIdx: uniqueIndex("reports_brand_period_unique").on(t.brandId, t.period, t.periodStart),
   }),
 );
 

@@ -21,6 +21,7 @@ import {
   scorePost,
 } from "../lib/performance-memory";
 import { logger } from "../lib/logger";
+import { emailReport, generateAndStoreReport, type ReportPeriod } from "../lib/reports";
 
 const router: IRouter = Router();
 
@@ -568,82 +569,40 @@ router.post("/analytics/brands/:id/reports", requireAuth, requireWorkspace, asyn
   const days = period === "weekly" ? 7 : 30;
   const periodEnd = new Date();
   const periodStart = new Date(periodEnd.getTime() - days * 24 * 60 * 60_000);
-  const since = periodStart.toISOString().slice(0, 10);
 
-  const totals = await db.execute<any>(sql`
-    SELECT COALESCE(SUM(impressions),0)::int AS impressions,
-           COALESCE(SUM(reach),0)::int AS reach,
-           COALESCE(SUM(likes),0)::int AS likes,
-           COALESCE(SUM(comments),0)::int AS comments,
-           COALESCE(SUM(shares),0)::int AS shares,
-           COALESCE(AVG(engagement_rate),0)::float AS engagement_rate
-    FROM brand_daily_aggregates
-    WHERE brand_id = ${id} AND day >= ${since}
-  `);
-  const top = await db.execute<any>(sql`
-    SELECT DISTINCT ON (s.post_id)
-      s.post_id, s.platform, s.likes, s.comments, s.shares, s.engagement_rate, p.content
-    FROM post_metrics_snapshots s
-    JOIN posts p ON p.id = s.post_id
-    WHERE s.brand_id = ${id} AND s.fetched_at >= ${periodStart}
-    ORDER BY s.post_id, s.fetched_at DESC
-    LIMIT 20
-  `);
-  const insights = await db
-    .select()
-    .from(aiInsightsTable)
-    .where(and(eq(aiInsightsTable.brandId, id), gte(aiInsightsTable.createdAt, periodStart)))
-    .limit(8);
-
-  const t = totals.rows[0] ?? {};
-  const summary = {
+  const { id: rowId, summary, html, createdAt } = await generateAndStoreReport({
     brand: { id: brand.id, name: brand.name },
-    period,
-    periodStart: periodStart.toISOString(),
-    periodEnd: periodEnd.toISOString(),
-    totals: {
-      impressions: Number(t.impressions ?? 0),
-      reach: Number(t.reach ?? 0),
-      likes: Number(t.likes ?? 0),
-      comments: Number(t.comments ?? 0),
-      shares: Number(t.shares ?? 0),
-      engagementRate: Number(t.engagement_rate ?? 0),
-    },
-    topPosts: top.rows.map((r: any) => ({
-      postId: Number(r.post_id),
-      platform: String(r.platform),
-      content: String(r.content ?? "").slice(0, 280),
-      likes: Number(r.likes),
-      comments: Number(r.comments),
-      shares: Number(r.shares),
-      engagementRate: Number(r.engagement_rate ?? 0),
-    })),
-    recommendations: insights.map((i) => ({ title: i.title, body: i.body, kind: i.kind })),
-  };
+    period: period as ReportPeriod,
+    periodStart,
+    periodEnd,
+    emailOptIn: Boolean(req.body?.emailOptIn ?? false),
+  });
 
-  const html = renderReportHtml(summary);
-
-  const [row] = await db
-    .insert(analyticsReportsTable)
-    .values({
-      brandId: id,
-      period,
-      periodStart,
-      periodEnd,
-      summary,
+  // Optional immediate send when requested. Restricted to editor+ to prevent
+  // low-privilege viewers from triggering owner/admin emails repeatedly.
+  if (req.body?.sendEmail) {
+    if (!hasRoleAtLeast(req.workspaceRole, "editor")) {
+      res.status(403).json({ error: "Editor role required to send report email" });
+      return;
+    }
+    await emailReport({
+      reportId: rowId,
+      brandId: brand.id,
+      workspaceId: req.workspaceId,
+      subject: `${brand.name} — ${period} performance report`,
       html,
-      emailOptIn: Boolean(req.body?.emailOptIn ?? false),
-    })
-    .returning();
+    });
+  }
+
   res.status(201).json({
-    id: row.id,
+    id: rowId,
     brandId: id,
     period,
     periodStart: periodStart.toISOString(),
     periodEnd: periodEnd.toISOString(),
     html,
     summary,
-    createdAt: row.createdAt.toISOString(),
+    createdAt: createdAt.toISOString(),
   });
 });
 
@@ -681,32 +640,5 @@ router.post("/analytics/brands/:id/seo", requireAuth, requireWorkspace, async (r
   const created = await generateSeoRecommendationsForBlog({ brandId: id, topic, draft });
   res.json({ created });
 });
-
-function renderReportHtml(s: any): string {
-  const top = (s.topPosts ?? []).slice(0, 5).map((p: any) => `
-    <li><strong>[${p.platform}]</strong> ${escapeHtml((p.content ?? "").slice(0, 160))} — ${p.likes} likes · ${p.comments} comments · ${p.shares} shares</li>
-  `).join("");
-  const recs = (s.recommendations ?? []).map((r: any) => `<li><strong>${escapeHtml(r.title)}</strong> — ${escapeHtml(r.body)}</li>`).join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(s.brand.name)} ${s.period} report</title>
-<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#111}
-h1{margin:0 0 4px}h2{margin-top:28px;border-bottom:1px solid #eee;padding-bottom:6px}
-.kpi{display:inline-block;margin:8px 18px 8px 0}.kpi b{display:block;font-size:22px}</style></head>
-<body><h1>${escapeHtml(s.brand.name)} — ${s.period} report</h1>
-<p>${new Date(s.periodStart).toLocaleDateString()} — ${new Date(s.periodEnd).toLocaleDateString()}</p>
-<h2>Key stats</h2>
-<div><span class="kpi"><b>${s.totals.reach.toLocaleString()}</b>Reach</span>
-<span class="kpi"><b>${s.totals.impressions.toLocaleString()}</b>Impressions</span>
-<span class="kpi"><b>${s.totals.likes.toLocaleString()}</b>Likes</span>
-<span class="kpi"><b>${s.totals.comments.toLocaleString()}</b>Comments</span>
-<span class="kpi"><b>${s.totals.shares.toLocaleString()}</b>Shares</span>
-<span class="kpi"><b>${(s.totals.engagementRate * 100).toFixed(2)}%</b>Engagement</span></div>
-<h2>Top posts</h2><ol>${top || "<li>No data yet.</li>"}</ol>
-<h2>Recommendations</h2><ul>${recs || "<li>No recommendations available yet.</li>"}</ul>
-</body></html>`;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
 
 export default router;

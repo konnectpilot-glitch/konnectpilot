@@ -24,6 +24,12 @@ import {
 } from "./analytics-collectors";
 import { ensureFreshAccessToken, forceRefreshAccessToken } from "./oauth-refresh";
 import { recomputePerformanceMemory } from "./performance-memory";
+import {
+  emailReport,
+  generateAndStoreReport,
+  listActiveBrandsForPeriod,
+  previousWeekRange,
+} from "./reports";
 
 // Per-platform concurrency caps to respect rate limits.
 const CONCURRENCY: Record<string, number> = {
@@ -33,11 +39,17 @@ const CONCURRENCY: Record<string, number> = {
 };
 const ANALYTICS_TICK_MS = 60_000;
 const FOLLOWER_TICK_MS = 30 * 60_000;
+const WEEKLY_REPORT_TICK_MS = 60 * 60_000; // hourly; the tick gates itself by day-of-week
 const RAW_RETENTION_DAYS = 90;
 
 let analyticsTimer: NodeJS.Timeout | null = null;
 let followerTimer: NodeJS.Timeout | null = null;
 let pruneTimer: NodeJS.Timeout | null = null;
+let weeklyReportTimer: NodeJS.Timeout | null = null;
+// Track the most recent week (periodStart ISO date) for which the weekly report
+// run completed inside this process, so the hourly tick is a true no-op for the
+// rest of the week even though it keeps firing.
+let lastWeeklyReportRun: string | null = null;
 
 // ---------- Cursor schedule (decaying frequency) ----------
 
@@ -405,6 +417,101 @@ async function runFollowerTick() {
   }
 }
 
+// ---------- Weekly report email ----------
+
+/**
+ * Build and email the previous week's report for every active workspace,
+ * once per week. Idempotent in two ways:
+ *  - In-process: gated by `lastWeeklyReportRun` so the hourly tick only does
+ *    real work once per ISO week.
+ *  - Cross-process / restart safe: the report row is upserted on
+ *    (brandId, period, periodStart) and the email send is gated by
+ *    `last_emailed_at` on that row.
+ */
+async function runWeeklyReportTick(now: Date = new Date()) {
+  // Run Monday–Wednesday UTC: Monday is the canonical send day, Tue/Wed
+  // provide a backfill window so a multi-hour outage doesn't drop a week.
+  // The per-row last_emailed_at claim still prevents duplicate sends if the
+  // Monday run partially succeeded.
+  const dow = now.getUTCDay();
+  if (dow < 1 || dow > 3) return;
+  const { periodStart, periodEnd } = previousWeekRange(now);
+  const weekKey = periodStart.toISOString().slice(0, 10);
+  if (lastWeeklyReportRun === weekKey) return;
+
+  try {
+    const brands = await listActiveBrandsForPeriod({ periodStart, periodEnd });
+    logger.info({ brandCount: brands.length, weekKey }, "Weekly report tick starting");
+    let sent = 0;
+    let alreadyEmailed = 0;
+    let skippedTerminal = 0; // no recipients / no mailer configured — won't fix on retry
+    let transientFailures = 0; // mailer rejection or thrown error — should retry
+    // Reasons returned by emailReport that we should not retry within the
+    // weekly window (re-running won't change the outcome until config changes).
+    const TERMINAL_REASONS = new Set([
+      "already emailed",
+      "no recipients",
+      "SENDGRID_API_KEY not configured",
+    ]);
+    for (const b of brands) {
+      try {
+        const { id: reportId, html } = await generateAndStoreReport({
+          brand: { id: b.brandId, name: b.name },
+          period: "weekly",
+          periodStart,
+          periodEnd,
+          emailOptIn: true,
+        });
+        const result = await emailReport({
+          reportId,
+          brandId: b.brandId,
+          workspaceId: b.workspaceId,
+          subject: `${b.name} — weekly performance report`,
+          html,
+        });
+        if (result.sent) {
+          sent++;
+        } else if (result.reason && TERMINAL_REASONS.has(result.reason)) {
+          if (result.reason === "already emailed") alreadyEmailed++;
+          else skippedTerminal++;
+        } else {
+          // Anything else (e.g. "sendgrid status 5xx", network error string) is
+          // treated as transient and will be retried on the next hourly tick.
+          transientFailures++;
+        }
+        logger.info(
+          {
+            brandId: b.brandId,
+            workspaceId: b.workspaceId,
+            sent: result.sent,
+            recipients: result.recipients.length,
+            reason: result.reason,
+          },
+          "weekly report processed",
+        );
+      } catch (err: any) {
+        transientFailures++;
+        logger.warn({ err: err?.message, brandId: b.brandId }, "weekly report failed for brand");
+      }
+    }
+    logger.info(
+      { weekKey, brandCount: brands.length, sent, alreadyEmailed, skippedTerminal, transientFailures },
+      "Weekly report tick finished",
+    );
+    // Suppress in-process retries only when no brand had a retryable failure.
+    // Terminal skips (no recipients / mailer unconfigured) and successful sends
+    // are both fine; transient failures (network/mailer 5xx, exceptions) leave
+    // the gate open so the next hourly tick within the Mon–Wed window retries.
+    // Cross-process duplicate sends remain prevented by the per-row
+    // `last_emailed_at` claim in `emailReport`.
+    if (transientFailures === 0) {
+      lastWeeklyReportRun = weekKey;
+    }
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Weekly report tick failed");
+  }
+}
+
 // ---------- Retention ----------
 
 async function pruneOldSnapshots() {
@@ -422,17 +529,20 @@ export function startAnalyticsScheduler() {
   analyticsTimer = setInterval(() => void runAnalyticsTick(), ANALYTICS_TICK_MS);
   followerTimer = setInterval(() => void runFollowerTick(), FOLLOWER_TICK_MS);
   pruneTimer = setInterval(() => void pruneOldSnapshots(), 24 * 60 * 60_000);
+  weeklyReportTimer = setInterval(() => void runWeeklyReportTick(), WEEKLY_REPORT_TICK_MS);
   // Run once shortly after boot.
   setTimeout(() => void runAnalyticsTick(), 10_000);
   setTimeout(() => void runFollowerTick(), 30_000);
+  setTimeout(() => void runWeeklyReportTick(), 60_000);
 }
 
 export function stopAnalyticsScheduler() {
   if (analyticsTimer) clearInterval(analyticsTimer);
   if (followerTimer) clearInterval(followerTimer);
   if (pruneTimer) clearInterval(pruneTimer);
-  analyticsTimer = followerTimer = pruneTimer = null;
+  if (weeklyReportTimer) clearInterval(weeklyReportTimer);
+  analyticsTimer = followerTimer = pruneTimer = weeklyReportTimer = null;
 }
 
 // Exposed for tests / manual triggers.
-export const _internal = { runAnalyticsTick, runFollowerTick, pruneOldSnapshots };
+export const _internal = { runAnalyticsTick, runFollowerTick, pruneOldSnapshots, runWeeklyReportTick };
