@@ -74,6 +74,7 @@ export default function ApprovalPage() {
   const queryClient = useQueryClient();
 
   const [tab, setTab] = useState<Tab>("pending");
+  const [brandFilter, setBrandFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState<PostRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -97,10 +98,20 @@ export default function ApprovalPage() {
 
   const filtered: PostRow[] = useMemo(() => {
     const tabDef = TABS.find((t) => t.key === tab)!;
-    return ((posts as PostRow[] | undefined) ?? []).filter((p) =>
-      tabDef.statuses.includes(p.status),
+    return ((posts as PostRow[] | undefined) ?? []).filter(
+      (p) =>
+        tabDef.statuses.includes(p.status) &&
+        (brandFilter === "all" || String(p.brandId) === brandFilter),
     );
-  }, [posts, tab]);
+  }, [posts, tab, brandFilter]);
+
+  function countFor(statuses: string[]): number {
+    return ((posts as PostRow[] | undefined) ?? []).filter(
+      (p) =>
+        statuses.includes(p.status) &&
+        (brandFilter === "all" || String(p.brandId) === brandFilter),
+    ).length;
+  }
 
   const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
   function toggleAll() {
@@ -258,12 +269,34 @@ export default function ApprovalPage() {
           </div>
         )}
 
+        {/* Brand filter */}
+        {brands && brands.length > 0 && (
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <Label className="text-xs text-muted-foreground">Filter by brand:</Label>
+            <Select value={brandFilter} onValueChange={(v) => { setBrandFilter(v); setSelected(new Set()); }}>
+              <SelectTrigger className="h-9 w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All brands ({((posts as PostRow[] | undefined) ?? []).length})</SelectItem>
+                {brands.map((b: any) => {
+                  const c = ((posts as PostRow[] | undefined) ?? []).filter((p) => p.brandId === b.id).length;
+                  return (
+                    <SelectItem key={b.id} value={String(b.id)}>{b.name} ({c})</SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {brandFilter !== "all" && (
+              <Button size="sm" variant="ghost" onClick={() => setBrandFilter("all")}>Clear</Button>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border mb-4 overflow-x-auto">
           {TABS.map((t) => {
-            const count = ((posts as PostRow[] | undefined) ?? []).filter((p) =>
-              t.statuses.includes(p.status),
-            ).length;
+            const count = countFor(t.statuses);
             return (
               <button
                 key={t.key}
