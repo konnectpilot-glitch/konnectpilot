@@ -30,8 +30,14 @@ function serializeAdminUser(row: {
   postCount: number;
   captionUsed: number;
   imageUsed: number;
-  lastActivityAt: Date | null;
+  lastActivityAt: Date | string | null;
 }) {
+  const lastActivity =
+    row.lastActivityAt == null
+      ? null
+      : row.lastActivityAt instanceof Date
+        ? row.lastActivityAt
+        : new Date(row.lastActivityAt);
   const plan = row.user.plan;
   const status = row.user.subscriptionStatus;
   const mrrCents =
@@ -52,7 +58,7 @@ function serializeAdminUser(row: {
     captionUsed: row.captionUsed,
     imageUsed: row.imageUsed,
     mrrCents,
-    lastActivityAt: row.lastActivityAt?.toISOString() ?? null,
+    lastActivityAt: lastActivity ? lastActivity.toISOString() : null,
     createdAt: row.user.createdAt.toISOString(),
   };
 }

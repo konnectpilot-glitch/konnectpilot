@@ -128,33 +128,55 @@ async function ensureUser(clerkId: string, email: string) {
       );
   }
   if (!personal) {
-    // Defensive: an existing user with no personal workspace shouldn't happen
-    // after the migration, but if it does, surface a clear error rather than a
-    // ReferenceError further down.
-    throw new Error(`User ${user.id} has no personal workspace`);
+    // Existing user without a personal workspace (e.g. a legacy account
+    // created before the workspaces migration). Lazily create one + the
+    // owner membership row so auth flows don't 500. Use the same advisory
+    // lock as the new-user bootstrap to serialize concurrent requests.
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${clerkId}, 0))`);
+      [personal] = await tx
+        .select()
+        .from(workspacesTable)
+        .where(
+          and(eq(workspacesTable.ownerId, user.id), eq(workspacesTable.isPersonal, true)),
+        );
+      if (!personal) {
+        [personal] = await tx
+          .insert(workspacesTable)
+          .values({ name: "Personal", ownerId: user.id, isPersonal: true })
+          .returning();
+      }
+      await tx
+        .insert(workspaceMembersTable)
+        .values({ workspaceId: personal!.id, userId: user.id, role: "owner" })
+        .onConflictDoNothing();
+    });
   }
 
-  // Backfill legacy records (one-shot — safe to run repeatedly: only updates rows
-  // where workspaceId is null AND userId matches this user)
+  // Backfill legacy records owned by THIS user only. All filters are
+  // scoped by user.id so concurrent calls from other users never mutate
+  // each other's rows.
   await db
     .update(brandsTable)
-    .set({ workspaceId: personal.id })
+    .set({ workspaceId: personal!.id })
     .where(and(eq(brandsTable.userId, user.id), isNull(brandsTable.workspaceId)));
   await db
     .update(postingSchedulesTable)
-    .set({ workspaceId: personal.id })
+    .set({ workspaceId: personal!.id })
     .where(and(eq(postingSchedulesTable.userId, user.id), isNull(postingSchedulesTable.workspaceId)));
   await db
     .update(socialAccountsTable)
-    .set({ workspaceId: personal.id })
+    .set({ workspaceId: personal!.id })
     .where(and(eq(socialAccountsTable.userId, user.id), isNull(socialAccountsTable.workspaceId)));
-  // Posts inherit workspace from brand
+  // Posts inherit workspace from brand — scoped to this user's brands so
+  // we never touch other tenants' rows.
   await db.execute(sql`
     UPDATE posts SET workspace_id = b.workspace_id
     FROM brands b
     WHERE posts.brand_id = b.id
       AND posts.workspace_id IS NULL
       AND b.workspace_id IS NOT NULL
+      AND b.user_id = ${user.id}
   `);
 
   if (!user.activeWorkspaceId) {
