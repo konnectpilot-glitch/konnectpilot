@@ -1045,8 +1045,8 @@ export default function BrandDetailPage() {
     return () => { cancelled = true; };
   }, [getToken]);
 
-  const { data: brand, isLoading } = useGetBrand(brandId, {
-    query: { enabled: Number.isFinite(brandId) && brandId > 0, queryKey: getGetBrandQueryKey(brandId) },
+  const { data: brand, isLoading, isError } = useGetBrand(brandId, {
+    query: { enabled: Number.isFinite(brandId) && brandId > 0, queryKey: getGetBrandQueryKey(brandId), retry: false },
   });
 
   const { data: allSchedules = [] } = useQuery<Schedule[]>({
@@ -1086,13 +1086,29 @@ export default function BrandDetailPage() {
     );
   }
 
-  if (isLoading || !brand) {
+  if (isLoading) {
     return (
       <Layout>
         <div className="p-6 max-w-5xl mx-auto">
           <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
             <Loader2 className="w-5 h-5 animate-spin" /> Loading brand…
           </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isError || !brand) {
+    return (
+      <Layout>
+        <div className="p-6 max-w-3xl mx-auto text-center py-16 space-y-3">
+          <h2 className="text-lg font-semibold">Brand not found</h2>
+          <p className="text-sm text-muted-foreground">
+            This brand may have been deleted or you don't have access to it.
+          </p>
+          <Link href="/brands" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+            <ArrowLeft className="w-4 h-4" /> Back to brands
+          </Link>
         </div>
       </Layout>
     );
