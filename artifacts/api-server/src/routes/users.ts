@@ -35,6 +35,18 @@ export function hasRoleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean
 // Ensure user exists in DB and has a personal workspace + ownership row.
 // Backfills any of their legacy records (brands/posts/schedules/social accounts)
 // that have no workspaceId so existing data continues to work after this migration.
+// Comma-separated list of emails (case-insensitive) that should always be
+// granted superadmin on sign-in. Used to bootstrap the first admin in a
+// fresh deployment where no DB write tooling is available.
+function superadminEmails(): Set<string> {
+  return new Set(
+    (process.env.SUPERADMIN_EMAILS ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 async function ensureUser(clerkId: string, email: string) {
   // Fast path: user already exists, no bootstrap needed.
   let [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
@@ -185,6 +197,21 @@ async function ensureUser(clerkId: string, email: string) {
       .set({ activeWorkspaceId: personal.id })
       .where(eq(usersTable.id, user.id))
       .returning();
+  }
+
+  // Auto-promote configured emails to superadmin (idempotent). Runs on every
+  // sign-in for both new and existing users so a fresh deployment can
+  // bootstrap its first admin via the SUPERADMIN_EMAILS env var without
+  // needing direct DB write access.
+  if (!user.isSuperadmin) {
+    const allow = superadminEmails();
+    if (user.email && allow.has(user.email.toLowerCase())) {
+      [user] = await db
+        .update(usersTable)
+        .set({ isSuperadmin: true })
+        .where(eq(usersTable.id, user.id))
+        .returning();
+    }
   }
 
   return user;
