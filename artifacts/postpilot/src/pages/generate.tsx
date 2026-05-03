@@ -331,7 +331,7 @@ export default function GeneratePage() {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Platform *</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {PLATFORMS.filter(p => !selectedBrand || selectedBrand.platforms.includes(p.id)).map(({ id, label, icon }) => (
+                    {PLATFORMS.map(({ id, label, icon }) => (
                       <label key={id} className="cursor-pointer">
                         <input type="radio" value={id} {...register("platform")} className="sr-only" />
                         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${

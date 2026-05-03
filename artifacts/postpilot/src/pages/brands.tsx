@@ -2,34 +2,18 @@ import Layout from "@/components/layout";
 import { Link } from "wouter";
 import { useListBrands, useDeleteBrand, getListBrandsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Building2, Pencil, Trash2, Facebook, Instagram, Linkedin, Zap } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
+import { Plus, Building2, ChevronRight, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
-
-function PlatformBadge({ platform }: { platform: string }) {
-  const config: Record<string, { icon: React.ReactNode; label: string; cls: string }> = {
-    facebook: { icon: <Facebook className="w-3 h-3" />, label: "Facebook", cls: "bg-blue-50 text-blue-700" },
-    instagram: { icon: <Instagram className="w-3 h-3" />, label: "Instagram", cls: "bg-pink-50 text-pink-700" },
-    linkedin: { icon: <Linkedin className="w-3 h-3" />, label: "LinkedIn", cls: "bg-blue-50 text-blue-800" },
-    tiktok: { icon: <FaTiktok className="w-3 h-3" />, label: "TikTok", cls: "bg-gray-100 text-gray-700" },
-  };
-  const c = config[platform];
-  if (!c) return null;
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${c.cls}`}>
-      {c.icon}
-      {c.label}
-    </span>
-  );
-}
 
 export default function BrandsPage() {
   const { data: brands, isLoading } = useListBrands();
   const deleteBrand = useDeleteBrand();
   const queryClient = useQueryClient();
 
-  async function handleDelete(id: number, name: string) {
-    if (!confirm(`Delete brand "${name}"? This will also delete all associated posts.`)) return;
+  async function handleDelete(e: React.MouseEvent, id: number, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete brand "${name}"? This will also delete all associated posts and schedules.`)) return;
     deleteBrand.mutate({ id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
@@ -45,7 +29,9 @@ export default function BrandsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Brands</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Manage your brands and their posting settings</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Each brand holds your identity, schedules, and posts in one place.
+            </p>
           </div>
           <Link href="/brands/new" className="flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors">
             <Plus className="w-4 h-4" />
@@ -78,48 +64,45 @@ export default function BrandsPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {brands?.map((brand) => (
-              <div key={brand.id} className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors group">
+              <Link
+                key={brand.id}
+                href={`/brands/${brand.id}`}
+                className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-sm transition-all group block"
+              >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Zap className="w-4 h-4 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground text-sm">{brand.name}</h3>
-                      <p className="text-xs text-muted-foreground capitalize">{brand.industry}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-foreground text-sm truncate">{brand.name}</h3>
+                      <p className="text-xs text-muted-foreground capitalize truncate">{brand.industry}</p>
                     </div>
                   </div>
-                  <div className={`w-2 h-2 rounded-full mt-1 ${brand.active ? "bg-green-500" : "bg-gray-300"}`} />
-                </div>
-
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {brand.platforms.map((p) => (
-                    <PlatformBadge key={p} platform={p} />
-                  ))}
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 mt-1.5" />
                 </div>
 
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mb-4">
                   <span className="capitalize bg-secondary px-2 py-0.5 rounded-full">{brand.tone}</span>
-                  <span>·</span>
-                  <span>Posts at {brand.postTime}</span>
                 </div>
 
+                {brand.targetAudience && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-4">
+                    {brand.targetAudience}
+                  </p>
+                )}
+
                 <div className="flex gap-2">
-                  <Link
-                    href={`/brands/${brand.id}`}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-border px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors"
-                  >
-                    <Pencil className="w-3 h-3" />
-                    Edit
-                  </Link>
                   <button
-                    onClick={() => handleDelete(brand.id, brand.name)}
-                    className="flex items-center justify-center gap-1.5 text-xs font-medium border border-border px-3 py-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+                    type="button"
+                    onClick={(e) => handleDelete(e, brand.id, brand.name)}
+                    className="text-xs font-medium text-muted-foreground hover:text-destructive flex items-center gap-1.5 transition-colors"
                   >
                     <Trash2 className="w-3 h-3" />
+                    Delete
                   </button>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

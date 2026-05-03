@@ -15,7 +15,6 @@ import {
   Clapperboard,
   ChevronDown,
   Share2,
-  CalendarClock,
   Shield,
 } from "lucide-react";
 import { useState } from "react";
@@ -45,7 +44,6 @@ const navItems: NavItem[] = [
     expandWhenInactive: false,
   },
   { href: "/library", label: "Library", icon: Library },
-  { href: "/schedules", label: "Auto Post", icon: CalendarClock },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/affiliate", label: "Affiliate", icon: DollarSign },

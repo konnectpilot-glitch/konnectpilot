@@ -1,23 +1,13 @@
 import Layout from "@/components/layout";
-import { Link, useRoute, useLocation } from "wouter";
-import { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { useForm, Controller } from "react-hook-form";
 import {
-  useGetBrand,
   useCreateBrand,
-  useUpdateBrand,
   getListBrandsQueryKey,
-  getGetBrandQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Facebook, Instagram, Linkedin, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const PLATFORMS = [
-  { id: "facebook", label: "Facebook", icon: <Facebook className="w-4 h-4 text-blue-600" /> },
-  { id: "instagram", label: "Instagram", icon: <Instagram className="w-4 h-4 text-pink-600" /> },
-  { id: "linkedin", label: "LinkedIn", icon: <Linkedin className="w-4 h-4 text-blue-700" /> },
-];
 
 const TONES = [
   { id: "friendly", label: "Friendly" },
@@ -32,29 +22,17 @@ type FormData = {
   tone: "friendly" | "professional" | "fun" | "inspirational";
   targetAudience: string;
   keywords: string;
-  platforms: string[];
-  postTime: string;
 };
 
 export default function BrandFormPage() {
   const [, setLocation] = useLocation();
-  const [matchEdit, params] = useRoute("/brands/:id");
-  const isEdit = matchEdit && params?.id !== "new";
-  const brandId = isEdit ? Number(params?.id) : null;
   const queryClient = useQueryClient();
-
-  const { data: brand } = useGetBrand(brandId!, {
-    query: { enabled: !!brandId, queryKey: getGetBrandQueryKey(brandId!) },
-  });
   const createBrand = useCreateBrand();
-  const updateBrand = useUpdateBrand();
 
   const {
     register,
     handleSubmit,
     control,
-    reset,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     defaultValues: {
@@ -63,59 +41,21 @@ export default function BrandFormPage() {
       tone: "professional",
       targetAudience: "",
       keywords: "",
-      platforms: [],
-      postTime: "09:00",
     },
   });
 
-  useEffect(() => {
-    if (brand) {
-      reset({
-        name: brand.name,
-        industry: brand.industry,
-        tone: brand.tone as any,
-        targetAudience: brand.targetAudience,
-        keywords: brand.keywords,
-        platforms: brand.platforms,
-        postTime: brand.postTime,
-      });
-    }
-  }, [brand, reset]);
-
-  const selectedPlatforms = watch("platforms");
-
   async function onSubmit(data: FormData) {
-    if (data.platforms.length === 0) {
-      toast.error("Please select at least one platform");
-      return;
-    }
-
-    if (isEdit && brandId) {
-      updateBrand.mutate(
-        { id: brandId, data },
-        {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getGetBrandQueryKey(brandId) });
-            toast.success("Brand updated successfully");
-            setLocation("/brands");
-          },
-          onError: (err: any) => toast.error(err?.data?.error ?? "Failed to update brand"),
-        }
-      );
-    } else {
-      createBrand.mutate(
-        { data },
-        {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
-            toast.success("Brand created successfully");
-            setLocation("/brands");
-          },
-          onError: (err: any) => toast.error(err?.data?.error ?? "Failed to create brand"),
-        }
-      );
-    }
+    createBrand.mutate(
+      { data },
+      {
+        onSuccess: (brand: any) => {
+          queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
+          toast.success("Brand created — set up a posting schedule next");
+          setLocation(brand?.id ? `/brands/${brand.id}` : "/brands");
+        },
+        onError: (err: any) => toast.error(err?.data?.error ?? "Failed to create brand"),
+      }
+    );
   }
 
   return (
@@ -126,16 +66,16 @@ export default function BrandFormPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{isEdit ? "Edit Brand" : "Create Brand"}</h1>
+            <h1 className="text-2xl font-bold text-foreground">Create Brand</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {isEdit ? "Update your brand details" : "Set up a new brand for AI post generation"}
+              Set up your brand's identity. You'll add posting schedules on the next screen.
             </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="font-semibold text-foreground text-sm">Brand Details</h2>
+            <h2 className="font-semibold text-foreground text-sm">Brand Identity</h2>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Brand Name *</label>
@@ -194,64 +134,13 @@ export default function BrandFormPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Keywords</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Keywords *</label>
               <input
                 {...register("keywords", { required: "Keywords are required" })}
                 className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="e.g. coffee, sustainability, morning routine"
               />
-              <p className="text-xs text-muted-foreground mt-1">Comma-separated keywords to include in posts</p>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="font-semibold text-foreground text-sm">Publishing Settings</h2>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Platforms *</label>
-              <Controller
-                name="platforms"
-                control={control}
-                render={({ field }) => (
-                  <div className="grid grid-cols-2 gap-2">
-                    {PLATFORMS.map(({ id, label, icon }) => {
-                      const selected = field.value.includes(id);
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => {
-                            if (selected) {
-                              field.onChange(field.value.filter((p: string) => p !== id));
-                            } else {
-                              field.onChange([...field.value, id]);
-                            }
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-                            selected
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-background text-foreground hover:bg-secondary"
-                          }`}
-                        >
-                          {icon}
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              />
-              {selectedPlatforms.length === 0 && <p className="text-xs text-muted-foreground mt-1">Select at least one platform</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Daily Post Time</label>
-              <input
-                type="time"
-                {...register("postTime")}
-                className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              />
-              <p className="text-xs text-muted-foreground mt-1">When to publish scheduled posts (your local time)</p>
+              <p className="text-xs text-muted-foreground mt-1">Comma-separated keywords AI will weave into posts</p>
             </div>
           </div>
 
@@ -261,13 +150,13 @@ export default function BrandFormPage() {
             </Link>
             <button
               type="submit"
-              disabled={isSubmitting || createBrand.isPending || updateBrand.isPending}
+              disabled={isSubmitting || createBrand.isPending}
               className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium px-4 py-2.5 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-60"
             >
-              {(isSubmitting || createBrand.isPending || updateBrand.isPending) && (
+              {(isSubmitting || createBrand.isPending) && (
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
-              {isEdit ? "Save Changes" : "Create Brand"}
+              Create Brand
             </button>
           </div>
         </form>

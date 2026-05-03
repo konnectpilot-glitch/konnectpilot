@@ -80,8 +80,8 @@ export const CreateBrandBody = zod.object({
   tone: zod.enum(["friendly", "professional", "fun", "inspirational"]),
   targetAudience: zod.string(),
   keywords: zod.string(),
-  platforms: zod.array(zod.string()),
-  postTime: zod.string().optional(),
+  platforms: zod.array(zod.string()).nullish(),
+  postTime: zod.string().nullish(),
 });
 
 /**

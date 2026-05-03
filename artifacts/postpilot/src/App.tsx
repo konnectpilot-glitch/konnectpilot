@@ -11,12 +11,12 @@ import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import BrandsPage from "@/pages/brands";
 import BrandFormPage from "@/pages/brand-form";
+import BrandDetailPage from "@/pages/brand-detail";
 import GeneratePage from "@/pages/generate";
 import PostsPage from "@/pages/posts";
 import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
-import SchedulesPage from "@/pages/schedules";
 import CalendarPage from "@/pages/calendar";
 import LibraryPage from "@/pages/library";
 import AffiliatePage from "@/pages/affiliate";
@@ -257,14 +257,13 @@ function ClerkProviderWithRoutes() {
           <Route path="/library" component={() => <ProtectedRoute component={LibraryPage} />} />
           <Route path="/affiliate" component={() => <ProtectedRoute component={AffiliatePage} />} />
           <Route path="/brands/new" component={() => <ProtectedRoute component={BrandFormPage} />} />
-          <Route path="/brands/:id" component={() => <ProtectedRoute component={BrandFormPage} />} />
+          <Route path="/brands/:id" component={() => <ProtectedRoute component={BrandDetailPage} />} />
           <Route path="/brands" component={() => <ProtectedRoute component={BrandsPage} />} />
           <Route path="/generate" component={() => <ProtectedRoute component={GeneratePage} />} />
           <Route path="/posts" component={() => <ProtectedRoute component={PostsPage} />} />
           <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />
-          <Route path="/schedules" component={() => <ProtectedRoute component={SchedulesPage} />} />
           <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
           <Route component={NotFound} />
         </Switch>

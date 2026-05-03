@@ -13,6 +13,8 @@ export interface CreateBrandBody {
   tone: CreateBrandBodyTone;
   targetAudience: string;
   keywords: string;
-  platforms: string[];
-  postTime?: string;
+  /** @nullable */
+  platforms?: string[] | null;
+  /** @nullable */
+  postTime?: string | null;
 }

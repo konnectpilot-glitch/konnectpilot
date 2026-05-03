@@ -65,7 +65,7 @@ router.post("/brands", requireAuth, requireWorkspace, async (req: any, res): Pro
       tone: parsed.data.tone,
       targetAudience: parsed.data.targetAudience,
       keywords: parsed.data.keywords,
-      platforms: parsed.data.platforms,
+      platforms: parsed.data.platforms ?? [],
       postTime: parsed.data.postTime ?? "09:00",
     })
     .returning();

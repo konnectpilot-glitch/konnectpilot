@@ -924,18 +924,17 @@ components:
         keywords:
           type: string
         platforms:
-          type: array
+          type: ["array", "null"]
           items:
             type: string
         postTime:
-          type: string
+          type: ["string", "null"]
       required:
         - name
         - industry
         - tone
         - targetAudience
         - keywords
-        - platforms
 
     UpdateBrandBody:
       type: object
