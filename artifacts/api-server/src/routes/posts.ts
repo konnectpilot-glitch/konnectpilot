@@ -44,6 +44,9 @@ router.get("/posts", requireAuth, requireWorkspace, async (req: any, res): Promi
     imageUrl: p.imageUrl ?? null,
     scheduledFor: p.scheduledFor?.toISOString() ?? null,
     publishedAt: p.publishedAt?.toISOString() ?? null,
+    aiApproved: p.aiApproved ?? null,
+    aiReviewReason: p.aiReviewReason ?? null,
+    aiReviewedAt: p.aiReviewedAt?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
   }))));
 });

@@ -14,6 +14,7 @@ import BrandFormPage from "@/pages/brand-form";
 import BrandDetailPage from "@/pages/brand-detail";
 import GeneratePage from "@/pages/generate";
 import PostsPage from "@/pages/posts";
+import ApprovalPage from "@/pages/approval";
 import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
@@ -261,6 +262,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/brands" component={() => <ProtectedRoute component={BrandsPage} />} />
           <Route path="/generate" component={() => <ProtectedRoute component={GeneratePage} />} />
           <Route path="/posts" component={() => <ProtectedRoute component={PostsPage} />} />
+          <Route path="/approval" component={() => <ProtectedRoute component={ApprovalPage} />} />
           <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />

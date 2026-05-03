@@ -21,6 +21,10 @@ export const postsTable = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     platformPostId: text("platform_post_id"),
     errorMessage: text("error_message"),
+    // AI second-pass validation result (auto-approval mode).
+    aiApproved: text("ai_approved"), // "yes" | "no" | null
+    aiReviewReason: text("ai_review_reason"),
+    aiReviewedAt: timestamp("ai_reviewed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },

@@ -5,6 +5,7 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateBrandBodyApprovalMode } from "./createBrandBodyApprovalMode";
 import type { CreateBrandBodyTone } from "./createBrandBodyTone";
 
 export interface CreateBrandBody {
@@ -17,4 +18,8 @@ export interface CreateBrandBody {
   platforms?: string[] | null;
   /** @nullable */
   postTime?: string | null;
+  /** @nullable */
+  approvalMode?: CreateBrandBodyApprovalMode;
+  /** @nullable */
+  autoGenerateEnabled?: boolean | null;
 }

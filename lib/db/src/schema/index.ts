@@ -7,3 +7,4 @@ export * from "./schedules";
 export * from "./ai-usage";
 export * from "./affiliates";
 export * from "./post-comments";
+export * from "./brand-memory";

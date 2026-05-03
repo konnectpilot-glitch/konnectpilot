@@ -26,11 +26,17 @@ import type {
   AttributeAffiliateSignup200,
   AttributeSignupBody,
   Brand,
+  BrandMemoryProfile,
+  BulkApprovalBody,
+  BulkApprovalResult,
   CheckoutSession,
   CreateBrandBody,
   CreateCheckoutBody,
   DashboardStats,
+  EditApprovalPostBody,
   ErrorResponse,
+  GenerateBatchBody,
+  GenerateBatchResult,
   GeneratePostBody,
   GeneratedPost,
   HealthStatus,
@@ -2568,6 +2574,361 @@ export function useGetPlatformBreakdown<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPlatformBreakdownQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Generates `days` worth of pending_approval posts for the given brand
+across the requested platforms. Free/starter plans can request up to
+15 days; pro/agency/business up to 30. If the brand's `approvalMode`
+is `auto`, each post is also run through the AI second-pass and
+auto-approved/rejected.
+
+ * @summary Pre-generate a batch of approval-queue posts for a brand
+ */
+export const getPostApprovalGenerateBatchUrl = () => {
+  return `/api/approval/generate-batch`;
+};
+
+export const postApprovalGenerateBatch = async (
+  generateBatchBody: GenerateBatchBody,
+  options?: RequestInit,
+): Promise<GenerateBatchResult> => {
+  return customFetch<GenerateBatchResult>(getPostApprovalGenerateBatchUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateBatchBody),
+  });
+};
+
+export const getPostApprovalGenerateBatchMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postApprovalGenerateBatch>>,
+    TError,
+    { data: BodyType<GenerateBatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postApprovalGenerateBatch>>,
+  TError,
+  { data: BodyType<GenerateBatchBody> },
+  TContext
+> => {
+  const mutationKey = ["postApprovalGenerateBatch"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postApprovalGenerateBatch>>,
+    { data: BodyType<GenerateBatchBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postApprovalGenerateBatch(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostApprovalGenerateBatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApprovalGenerateBatch>>
+>;
+export type PostApprovalGenerateBatchMutationBody = BodyType<GenerateBatchBody>;
+export type PostApprovalGenerateBatchMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Pre-generate a batch of approval-queue posts for a brand
+ */
+export const usePostApprovalGenerateBatch = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postApprovalGenerateBatch>>,
+    TError,
+    { data: BodyType<GenerateBatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postApprovalGenerateBatch>>,
+  TError,
+  { data: BodyType<GenerateBatchBody> },
+  TContext
+> => {
+  return useMutation(getPostApprovalGenerateBatchMutationOptions(options));
+};
+
+/**
+ * Updating the caption logs an `edited` feedback event for the brand
+memory profile. Editor or admin role required.
+
+ * @summary Edit a pending-approval post (caption, image, schedule)
+ */
+export const getPatchApprovalPostsIdUrl = (id: number) => {
+  return `/api/approval/posts/${id}`;
+};
+
+export const patchApprovalPostsId = async (
+  id: number,
+  editApprovalPostBody: EditApprovalPostBody,
+  options?: RequestInit,
+): Promise<Post> => {
+  return customFetch<Post>(getPatchApprovalPostsIdUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(editApprovalPostBody),
+  });
+};
+
+export const getPatchApprovalPostsIdMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchApprovalPostsId>>,
+    TError,
+    { id: number; data: BodyType<EditApprovalPostBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchApprovalPostsId>>,
+  TError,
+  { id: number; data: BodyType<EditApprovalPostBody> },
+  TContext
+> => {
+  const mutationKey = ["patchApprovalPostsId"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchApprovalPostsId>>,
+    { id: number; data: BodyType<EditApprovalPostBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return patchApprovalPostsId(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchApprovalPostsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApprovalPostsId>>
+>;
+export type PatchApprovalPostsIdMutationBody = BodyType<EditApprovalPostBody>;
+export type PatchApprovalPostsIdMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Edit a pending-approval post (caption, image, schedule)
+ */
+export const usePatchApprovalPostsId = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchApprovalPostsId>>,
+    TError,
+    { id: number; data: BodyType<EditApprovalPostBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof patchApprovalPostsId>>,
+  TError,
+  { id: number; data: BodyType<EditApprovalPostBody> },
+  TContext
+> => {
+  return useMutation(getPatchApprovalPostsIdMutationOptions(options));
+};
+
+/**
+ * @summary Apply a bulk action to many posts (approve, reject, reschedule, delete)
+ */
+export const getPostApprovalBulkUrl = () => {
+  return `/api/approval/bulk`;
+};
+
+export const postApprovalBulk = async (
+  bulkApprovalBody: BulkApprovalBody,
+  options?: RequestInit,
+): Promise<BulkApprovalResult> => {
+  return customFetch<BulkApprovalResult>(getPostApprovalBulkUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkApprovalBody),
+  });
+};
+
+export const getPostApprovalBulkMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postApprovalBulk>>,
+    TError,
+    { data: BodyType<BulkApprovalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postApprovalBulk>>,
+  TError,
+  { data: BodyType<BulkApprovalBody> },
+  TContext
+> => {
+  const mutationKey = ["postApprovalBulk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postApprovalBulk>>,
+    { data: BodyType<BulkApprovalBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postApprovalBulk(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostApprovalBulkMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApprovalBulk>>
+>;
+export type PostApprovalBulkMutationBody = BodyType<BulkApprovalBody>;
+export type PostApprovalBulkMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Apply a bulk action to many posts (approve, reject, reschedule, delete)
+ */
+export const usePostApprovalBulk = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postApprovalBulk>>,
+    TError,
+    { data: BodyType<BulkApprovalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postApprovalBulk>>,
+  TError,
+  { data: BodyType<BulkApprovalBody> },
+  TContext
+> => {
+  return useMutation(getPostApprovalBulkMutationOptions(options));
+};
+
+/**
+ * @summary Read the brand memory profile (learned style from feedback)
+ */
+export const getGetBrandsIdMemoryUrl = (id: number) => {
+  return `/api/brands/${id}/memory`;
+};
+
+export const getBrandsIdMemory = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BrandMemoryProfile> => {
+  return customFetch<BrandMemoryProfile>(getGetBrandsIdMemoryUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBrandsIdMemoryQueryKey = (id: number) => {
+  return [`/api/brands/${id}/memory`] as const;
+};
+
+export const getGetBrandsIdMemoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBrandsIdMemory>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBrandsIdMemory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBrandsIdMemoryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBrandsIdMemory>>
+  > = ({ signal }) => getBrandsIdMemory(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBrandsIdMemory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBrandsIdMemoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBrandsIdMemory>>
+>;
+export type GetBrandsIdMemoryQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Read the brand memory profile (learned style from feedback)
+ */
+
+export function useGetBrandsIdMemory<
+  TData = Awaited<ReturnType<typeof getBrandsIdMemory>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBrandsIdMemory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBrandsIdMemoryQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

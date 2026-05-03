@@ -5,6 +5,7 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BrandApprovalMode } from "./brandApprovalMode";
 import type { BrandTone } from "./brandTone";
 
 export interface Brand {
@@ -18,5 +19,9 @@ export interface Brand {
   platforms: string[];
   postTime: string;
   active: boolean;
+  approvalMode: BrandApprovalMode;
+  autoGenerateEnabled: boolean;
+  /** @nullable */
+  lastBatchGeneratedAt?: string | null;
   createdAt: string;
 }

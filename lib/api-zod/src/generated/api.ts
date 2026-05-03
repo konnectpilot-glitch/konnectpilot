@@ -67,6 +67,9 @@ export const ListBrandsResponseItem = zod.object({
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
+  approvalMode: zod.enum(["manual", "auto"]),
+  autoGenerateEnabled: zod.boolean(),
+  lastBatchGeneratedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListBrandsResponse = zod.array(ListBrandsResponseItem);
@@ -82,6 +85,10 @@ export const CreateBrandBody = zod.object({
   keywords: zod.string(),
   platforms: zod.array(zod.string()).nullish(),
   postTime: zod.string().nullish(),
+  approvalMode: zod
+    .union([zod.literal("manual"), zod.literal("auto"), zod.literal(null)])
+    .nullish(),
+  autoGenerateEnabled: zod.boolean().nullish(),
 });
 
 /**
@@ -102,6 +109,9 @@ export const GetBrandResponse = zod.object({
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
+  approvalMode: zod.enum(["manual", "auto"]),
+  autoGenerateEnabled: zod.boolean(),
+  lastBatchGeneratedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -121,6 +131,10 @@ export const UpdateBrandBody = zod.object({
   platforms: zod.array(zod.string()).nullish(),
   postTime: zod.string().nullish(),
   active: zod.boolean().nullish(),
+  approvalMode: zod
+    .union([zod.literal("manual"), zod.literal("auto"), zod.literal(null)])
+    .nullish(),
+  autoGenerateEnabled: zod.boolean().nullish(),
 });
 
 export const UpdateBrandResponse = zod.object({
@@ -134,6 +148,9 @@ export const UpdateBrandResponse = zod.object({
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
+  approvalMode: zod.enum(["manual", "auto"]),
+  autoGenerateEnabled: zod.boolean(),
+  lastBatchGeneratedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -173,6 +190,11 @@ export const ListPostsResponseItem = zod.object({
   ]),
   scheduledFor: zod.string().nullish(),
   publishedAt: zod.string().nullish(),
+  aiApproved: zod
+    .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+    .nullish(),
+  aiReviewReason: zod.string().nullish(),
+  aiReviewedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListPostsResponse = zod.array(ListPostsResponseItem);
@@ -292,6 +314,11 @@ export const GetRecentPostsResponseItem = zod.object({
   ]),
   scheduledFor: zod.string().nullish(),
   publishedAt: zod.string().nullish(),
+  aiApproved: zod
+    .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+    .nullish(),
+  aiReviewReason: zod.string().nullish(),
+  aiReviewedAt: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const GetRecentPostsResponse = zod.array(GetRecentPostsResponseItem);
@@ -540,3 +567,117 @@ export const GetPlatformBreakdownResponseItem = zod.object({
 export const GetPlatformBreakdownResponse = zod.array(
   GetPlatformBreakdownResponseItem,
 );
+
+/**
+ * Generates `days` worth of pending_approval posts for the given brand
+across the requested platforms. Free/starter plans can request up to
+15 days; pro/agency/business up to 30. If the brand's `approvalMode`
+is `auto`, each post is also run through the AI second-pass and
+auto-approved/rejected.
+
+ * @summary Pre-generate a batch of approval-queue posts for a brand
+ */
+export const postApprovalGenerateBatchBodyDaysMax = 30;
+
+export const PostApprovalGenerateBatchBody = zod.object({
+  brandId: zod.number(),
+  days: zod.number().min(1).max(postApprovalGenerateBatchBodyDaysMax),
+  platforms: zod.array(zod.string()).min(1),
+  startDate: zod.string().nullish(),
+});
+
+export const PostApprovalGenerateBatchResponse = zod.object({
+  created: zod.number(),
+  autoApproved: zod.number(),
+  autoRejected: zod.number(),
+  failed: zod.number(),
+  days: zod.number(),
+});
+
+/**
+ * Updating the caption logs an `edited` feedback event for the brand
+memory profile. Editor or admin role required.
+
+ * @summary Edit a pending-approval post (caption, image, schedule)
+ */
+export const PatchApprovalPostsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchApprovalPostsIdBody = zod.object({
+  content: zod.string().nullish(),
+  imageUrl: zod.string().nullish(),
+  scheduledFor: zod.string().nullish(),
+});
+
+export const PatchApprovalPostsIdResponse = zod.object({
+  id: zod.number(),
+  brandId: zod.number(),
+  brandName: zod.string().nullish(),
+  platform: zod.string(),
+  content: zod.string(),
+  imageUrl: zod.string().nullish(),
+  status: zod.enum([
+    "generated",
+    "published",
+    "failed",
+    "scheduled",
+    "pending_approval",
+    "rejected",
+    "pending",
+  ]),
+  scheduledFor: zod.string().nullish(),
+  publishedAt: zod.string().nullish(),
+  aiApproved: zod
+    .union([zod.literal("yes"), zod.literal("no"), zod.literal(null)])
+    .nullish(),
+  aiReviewReason: zod.string().nullish(),
+  aiReviewedAt: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Apply a bulk action to many posts (approve, reject, reschedule, delete)
+ */
+
+export const PostApprovalBulkBody = zod.object({
+  action: zod.enum(["approve", "reject", "reschedule", "delete"]),
+  postIds: zod.array(zod.number()).min(1),
+  reason: zod.string().nullish(),
+  publish: zod.boolean().nullish(),
+  scheduledFor: zod.string().nullish(),
+});
+
+export const PostApprovalBulkResponse = zod.object({
+  succeeded: zod.array(zod.number()),
+  skipped: zod.array(
+    zod.object({
+      id: zod.number(),
+      reason: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Read the brand memory profile (learned style from feedback)
+ */
+export const GetBrandsIdMemoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBrandsIdMemoryResponse = zod.object({
+  brandId: zod.number(),
+  approvedSamples: zod.array(zod.string()),
+  rejectedSamples: zod.array(zod.string()),
+  editPatterns: zod.array(
+    zod.object({
+      from: zod.string(),
+      to: zod.string(),
+    }),
+  ),
+  distilledGuidelines: zod.string().nullish(),
+  approvedCount: zod.number(),
+  rejectedCount: zod.number(),
+  editedCount: zod.number(),
+  updatedAt: zod.string(),
+});

@@ -805,6 +805,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /approval/generate-batch:
+    post:
+      summary: Pre-generate a batch of approval-queue posts for a brand
+      description: |
+        Generates `days` worth of pending_approval posts for the given brand
+        across the requested platforms. Free/starter plans can request up to
+        15 days; pro/agency/business up to 30. If the brand's `approvalMode`
+        is `auto`, each post is also run through the AI second-pass and
+        auto-approved/rejected.
+      tags: [approval]
+      security: [{ clerkAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateBatchBody"
+      responses:
+        "200":
+          description: Batch result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateBatchResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "402":
+          description: Plan limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /approval/posts/{id}:
+    patch:
+      summary: Edit a pending-approval post (caption, image, schedule)
+      description: |
+        Updating the caption logs an `edited` feedback event for the brand
+        memory profile. Editor or admin role required.
+      tags: [approval]
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditApprovalPostBody"
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /approval/bulk:
+    post:
+      summary: Apply a bulk action to many posts (approve, reject, reschedule, delete)
+      tags: [approval]
+      security: [{ clerkAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkApprovalBody"
+      responses:
+        "200":
+          description: Bulk result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkApprovalResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /brands/{id}/memory:
+    get:
+      summary: Read the brand memory profile (learned style from feedback)
+      tags: [approval]
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandMemoryProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     clerkAuth:
@@ -894,6 +1015,13 @@ components:
           type: string
         active:
           type: boolean
+        approvalMode:
+          type: string
+          enum: [manual, auto]
+        autoGenerateEnabled:
+          type: boolean
+        lastBatchGeneratedAt:
+          type: ["string", "null"]
         createdAt:
           type: string
       required:
@@ -907,6 +1035,8 @@ components:
         - platforms
         - postTime
         - active
+        - approvalMode
+        - autoGenerateEnabled
         - createdAt
 
     CreateBrandBody:
@@ -929,6 +1059,11 @@ components:
             type: string
         postTime:
           type: ["string", "null"]
+        approvalMode:
+          type: ["string", "null"]
+          enum: ["manual", "auto", null]
+        autoGenerateEnabled:
+          type: ["boolean", "null"]
       required:
         - name
         - industry
@@ -957,6 +1092,11 @@ components:
           type: ["string", "null"]
         active:
           type: ["boolean", "null"]
+        approvalMode:
+          type: ["string", "null"]
+          enum: ["manual", "auto", null]
+        autoGenerateEnabled:
+          type: ["boolean", "null"]
 
     Post:
       type: object
@@ -979,6 +1119,13 @@ components:
         scheduledFor:
           type: ["string", "null"]
         publishedAt:
+          type: ["string", "null"]
+        aiApproved:
+          type: ["string", "null"]
+          enum: ["yes", "no", null]
+        aiReviewReason:
+          type: ["string", "null"]
+        aiReviewedAt:
           type: ["string", "null"]
         createdAt:
           type: string
@@ -1348,6 +1495,142 @@ components:
         - config
         - stats
         - recentReferrals
+
+    GenerateBatchBody:
+      type: object
+      properties:
+        brandId:
+          type: integer
+        days:
+          type: integer
+          minimum: 1
+          maximum: 30
+        platforms:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        startDate:
+          type: ["string", "null"]
+      required:
+        - brandId
+        - days
+        - platforms
+
+    GenerateBatchResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        autoApproved:
+          type: integer
+        autoRejected:
+          type: integer
+        failed:
+          type: integer
+        days:
+          type: integer
+      required:
+        - created
+        - autoApproved
+        - autoRejected
+        - failed
+        - days
+
+    EditApprovalPostBody:
+      type: object
+      properties:
+        content:
+          type: ["string", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        scheduledFor:
+          type: ["string", "null"]
+
+    BulkApprovalBody:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [approve, reject, reschedule, delete]
+        postIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+        reason:
+          type: ["string", "null"]
+        publish:
+          type: ["boolean", "null"]
+        scheduledFor:
+          type: ["string", "null"]
+      required:
+        - action
+        - postIds
+
+    BulkApprovalResult:
+      type: object
+      properties:
+        succeeded:
+          type: array
+          items:
+            type: integer
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              reason:
+                type: string
+            required: [id, reason]
+      required:
+        - succeeded
+        - skipped
+
+    BrandMemoryProfile:
+      type: object
+      properties:
+        brandId:
+          type: integer
+        approvedSamples:
+          type: array
+          items:
+            type: string
+        rejectedSamples:
+          type: array
+          items:
+            type: string
+        editPatterns:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+            required: [from, to]
+        distilledGuidelines:
+          type: ["string", "null"]
+        approvedCount:
+          type: integer
+        rejectedCount:
+          type: integer
+        editedCount:
+          type: integer
+        updatedAt:
+          type: string
+      required:
+        - brandId
+        - approvedSamples
+        - rejectedSamples
+        - editPatterns
+        - approvedCount
+        - rejectedCount
+        - editedCount
+        - updatedAt
 
     AdminAffiliateSummary:
       type: object

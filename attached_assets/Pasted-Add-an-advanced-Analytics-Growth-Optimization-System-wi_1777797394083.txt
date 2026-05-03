@@ -1,0 +1,37 @@
+Add an advanced “Analytics & Growth Optimization System” with the following requirements:
+
+* The system must track performance of all published posts across connected platforms (Facebook, Instagram, LinkedIn) using official platform APIs.
+* Collect and analyze key metrics such as:
+    * Reach / Impressions
+    * Engagement (likes, comments, shares)
+    * Click-through rate (CTR)
+    * Follower growth
+    * Best performing post types (image, text, carousel, etc.)
+    * Best posting times per platform
+* Build a centralized “Analytics Dashboard” where users can:
+    * View performance by brand and by platform
+    * Compare posts performance
+    * Identify top-performing content
+    * Track growth trends over time
+* Implement AI-driven insights:
+    * Suggest best time to post
+    * Recommend content types based on performance
+    * Suggest improvements in captions, hashtags, and visuals
+    * Provide SEO recommendations for blog content (keywords, structure, readability)
+* Integrate feedback loop from platform APIs:
+    * Use engagement data to refine future AI-generated posts
+    * Automatically adjust tone, style, and format based on high-performing posts
+    * Improve hashtag strategy based on reach and engagement
+* Add “Content Optimization Engine”:
+    * AI should learn from analytics data
+    * Continuously improve content generation for better reach and engagement
+    * Adapt content separately for each platform (platform-specific optimization)
+* Include reports and insights:
+    * Weekly and monthly performance reports
+    * Growth summary per brand
+    * Actionable recommendations for improvement
+* Ensure scalability and efficiency:
+    * Use background jobs/queues for data fetching and processing
+    * Handle API rate limits properly
+    * Store analytics data efficiently for long-term learning
+* The goal is to create a self-improving system where analytics + AI feedback helps generate better content and achieve faster account growth and stronger SEO results over time.

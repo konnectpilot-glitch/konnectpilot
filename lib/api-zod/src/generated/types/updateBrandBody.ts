@@ -5,6 +5,7 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateBrandBodyApprovalMode } from "./updateBrandBodyApprovalMode";
 
 export interface UpdateBrandBody {
   /** @nullable */
@@ -23,4 +24,8 @@ export interface UpdateBrandBody {
   postTime?: string | null;
   /** @nullable */
   active?: boolean | null;
+  /** @nullable */
+  approvalMode?: UpdateBrandBodyApprovalMode;
+  /** @nullable */
+  autoGenerateEnabled?: boolean | null;
 }

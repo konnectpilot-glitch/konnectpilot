@@ -13,6 +13,7 @@ import {
   Zap,
   Share2,
   Shield,
+  ClipboardCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { href: "/brands", label: "Brands", icon: Building2 },
   { href: "/generate", label: "Generate Post", icon: Sparkles },
   { href: "/library", label: "Library", icon: Library },
+  { href: "/approval", label: "Approval Queue", icon: ClipboardCheck },
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/affiliate", label: "Affiliate", icon: DollarSign },

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, postsTable, postCommentsTable, usersTable } from "@workspace/db";
 import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import { retryPost } from "../lib/scheduler";
+import { recordFeedback } from "../lib/brand-memory";
 
 const router: IRouter = Router();
 
@@ -188,6 +189,14 @@ router.post("/posts/:id/approve", requireAuth, requireWorkspace, async (req: any
     })
     .where(eq(postsTable.id, id));
 
+  void recordFeedback({
+    postId: id,
+    brandId: post.brandId,
+    action: "approved",
+    originalContent: post.content,
+    finalContent: post.content,
+  }).catch(() => {});
+
   if (shouldPublish) {
     // retryPost expects a non-pending status — flip to "failed" briefly so it
     // re-uses the already-generated caption/image and publishes.
@@ -232,6 +241,14 @@ router.post("/posts/:id/reject", requireAuth, requireWorkspace, async (req: any,
     })
     .where(eq(postsTable.id, id))
     .returning();
+  void recordFeedback({
+    postId: id,
+    brandId: post.brandId,
+    action: "rejected",
+    reason: body.success ? body.data.reason ?? null : null,
+    originalContent: post.content,
+    finalContent: post.content,
+  }).catch(() => {});
   res.json(updated);
 });
 

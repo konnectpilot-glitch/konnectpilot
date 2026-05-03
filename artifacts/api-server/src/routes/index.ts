@@ -13,6 +13,7 @@ import adminRouter from "./admin";
 import affiliateRouter from "./affiliate";
 import workspacesRouter from "./workspaces";
 import postCommentsRouter from "./post-comments";
+import approvalRouter from "./approval";
 
 const router: IRouter = Router();
 
@@ -22,6 +23,7 @@ router.use(workspacesRouter);
 router.use(brandsRouter);
 router.use(postsRouter);
 router.use(postCommentsRouter);
+router.use(approvalRouter);
 router.use(generateRouter);
 router.use(billingRouter);
 router.use(dashboardRouter);

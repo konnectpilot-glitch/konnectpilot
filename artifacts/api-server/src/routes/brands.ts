@@ -67,6 +67,8 @@ router.post("/brands", requireAuth, requireWorkspace, async (req: any, res): Pro
       keywords: parsed.data.keywords,
       platforms: parsed.data.platforms ?? [],
       postTime: parsed.data.postTime ?? "09:00",
+      approvalMode: parsed.data.approvalMode ?? "manual",
+      autoGenerateEnabled: parsed.data.autoGenerateEnabled ?? false,
     })
     .returning();
 
@@ -125,6 +127,8 @@ router.patch("/brands/:id", requireAuth, requireWorkspace, async (req: any, res)
   if (parsed.data.platforms != null) updates.platforms = parsed.data.platforms;
   if (parsed.data.postTime != null) updates.postTime = parsed.data.postTime;
   if (parsed.data.active != null) updates.active = parsed.data.active;
+  if (parsed.data.approvalMode != null) updates.approvalMode = parsed.data.approvalMode;
+  if (parsed.data.autoGenerateEnabled != null) updates.autoGenerateEnabled = parsed.data.autoGenerateEnabled;
 
   const [brand] = await db
     .update(brandsTable)

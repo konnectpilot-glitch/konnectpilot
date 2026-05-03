@@ -10,6 +10,7 @@ import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
+import { buildBrandMemoryContext } from "../lib/brand-memory";
 
 const router: IRouter = Router();
 
@@ -24,7 +25,7 @@ function quotaExceededResponse(res: any, kind: "caption" | "image", used: number
   });
 }
 
-function buildPrompt(brand: any, platform: string, topic?: string | null): string {
+function buildPrompt(brand: any, platform: string, topic?: string | null, brandMemory: string = ""): string {
   const platformInstructions: Record<string, string> = {
     instagram: `Write an engaging Instagram caption. Include 3-5 relevant hashtags at the end. Keep it visual and engaging. Max 200 words.`,
     facebook: `Write a conversational Facebook post. End with an engaging question to drive comments. Max 150 words.`,
@@ -46,7 +47,7 @@ Platform: ${platform.charAt(0).toUpperCase() + platform.slice(1)}
 ${topicLine}
 
 Instructions: ${instruction}
-
+${brandMemory}
 Write ONLY the post content. No preamble, no explanations, just the post text itself.`;
 }
 
@@ -73,7 +74,8 @@ router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): P
     return;
   }
 
-  const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic);
+  const brandMemory = await buildBrandMemoryContext(brand.id);
+  const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic, brandMemory);
 
   try {
     const completion = await openai.chat.completions.create({

@@ -55,6 +55,14 @@ export const BrandTone = {
   inspirational: "inspirational",
 } as const;
 
+export type BrandApprovalMode =
+  (typeof BrandApprovalMode)[keyof typeof BrandApprovalMode];
+
+export const BrandApprovalMode = {
+  manual: "manual",
+  auto: "auto",
+} as const;
+
 export interface Brand {
   id: number;
   userId: number;
@@ -66,6 +74,10 @@ export interface Brand {
   platforms: string[];
   postTime: string;
   active: boolean;
+  approvalMode: BrandApprovalMode;
+  autoGenerateEnabled: boolean;
+  /** @nullable */
+  lastBatchGeneratedAt?: string | null;
   createdAt: string;
 }
 
@@ -79,6 +91,18 @@ export const CreateBrandBodyTone = {
   inspirational: "inspirational",
 } as const;
 
+/**
+ * @nullable
+ */
+export type CreateBrandBodyApprovalMode =
+  | (typeof CreateBrandBodyApprovalMode)[keyof typeof CreateBrandBodyApprovalMode]
+  | null;
+
+export const CreateBrandBodyApprovalMode = {
+  manual: "manual",
+  auto: "auto",
+} as const;
+
 export interface CreateBrandBody {
   name: string;
   industry: string;
@@ -89,7 +113,23 @@ export interface CreateBrandBody {
   platforms?: string[] | null;
   /** @nullable */
   postTime?: string | null;
+  /** @nullable */
+  approvalMode?: CreateBrandBodyApprovalMode;
+  /** @nullable */
+  autoGenerateEnabled?: boolean | null;
 }
+
+/**
+ * @nullable
+ */
+export type UpdateBrandBodyApprovalMode =
+  | (typeof UpdateBrandBodyApprovalMode)[keyof typeof UpdateBrandBodyApprovalMode]
+  | null;
+
+export const UpdateBrandBodyApprovalMode = {
+  manual: "manual",
+  auto: "auto",
+} as const;
 
 export interface UpdateBrandBody {
   /** @nullable */
@@ -108,6 +148,10 @@ export interface UpdateBrandBody {
   postTime?: string | null;
   /** @nullable */
   active?: boolean | null;
+  /** @nullable */
+  approvalMode?: UpdateBrandBodyApprovalMode;
+  /** @nullable */
+  autoGenerateEnabled?: boolean | null;
 }
 
 export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
@@ -120,6 +164,18 @@ export const PostStatus = {
   pending_approval: "pending_approval",
   rejected: "rejected",
   pending: "pending",
+} as const;
+
+/**
+ * @nullable
+ */
+export type PostAiApproved =
+  | (typeof PostAiApproved)[keyof typeof PostAiApproved]
+  | null;
+
+export const PostAiApproved = {
+  yes: "yes",
+  no: "no",
 } as const;
 
 export interface Post {
@@ -136,6 +192,12 @@ export interface Post {
   scheduledFor?: string | null;
   /** @nullable */
   publishedAt?: string | null;
+  /** @nullable */
+  aiApproved?: PostAiApproved;
+  /** @nullable */
+  aiReviewReason?: string | null;
+  /** @nullable */
+  aiReviewedAt?: string | null;
   createdAt: string;
 }
 
@@ -345,6 +407,86 @@ export interface AffiliateProfile {
   config: AffiliateConfig;
   stats: AffiliateStats;
   recentReferrals: AffiliateReferralRow[];
+}
+
+export interface GenerateBatchBody {
+  brandId: number;
+  /**
+   * @minimum 1
+   * @maximum 30
+   */
+  days: number;
+  /** @minItems 1 */
+  platforms: string[];
+  /** @nullable */
+  startDate?: string | null;
+}
+
+export interface GenerateBatchResult {
+  created: number;
+  autoApproved: number;
+  autoRejected: number;
+  failed: number;
+  days: number;
+}
+
+export interface EditApprovalPostBody {
+  /** @nullable */
+  content?: string | null;
+  /** @nullable */
+  imageUrl?: string | null;
+  /** @nullable */
+  scheduledFor?: string | null;
+}
+
+export type BulkApprovalBodyAction =
+  (typeof BulkApprovalBodyAction)[keyof typeof BulkApprovalBodyAction];
+
+export const BulkApprovalBodyAction = {
+  approve: "approve",
+  reject: "reject",
+  reschedule: "reschedule",
+  delete: "delete",
+} as const;
+
+export interface BulkApprovalBody {
+  action: BulkApprovalBodyAction;
+  /** @minItems 1 */
+  postIds: number[];
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  publish?: boolean | null;
+  /** @nullable */
+  scheduledFor?: string | null;
+}
+
+export type BulkApprovalResultSkippedItem = {
+  id: number;
+  reason: string;
+};
+
+export interface BulkApprovalResult {
+  succeeded: number[];
+  skipped: BulkApprovalResultSkippedItem[];
+}
+
+export type BrandMemoryProfileEditPatternsItem = {
+  from: string;
+  to: string;
+};
+
+export interface BrandMemoryProfile {
+  brandId: number;
+  approvedSamples: string[];
+  rejectedSamples: string[];
+  editPatterns: BrandMemoryProfileEditPatternsItem[];
+  /** @nullable */
+  distilledGuidelines?: string | null;
+  approvedCount: number;
+  rejectedCount: number;
+  editedCount: number;
+  updatedAt: string;
 }
 
 export interface AdminAffiliateSummary {

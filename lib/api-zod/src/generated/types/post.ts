@@ -5,6 +5,7 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PostAiApproved } from "./postAiApproved";
 import type { PostStatus } from "./postStatus";
 
 export interface Post {
@@ -21,5 +22,11 @@ export interface Post {
   scheduledFor?: string | null;
   /** @nullable */
   publishedAt?: string | null;
+  /** @nullable */
+  aiApproved?: PostAiApproved;
+  /** @nullable */
+  aiReviewReason?: string | null;
+  /** @nullable */
+  aiReviewedAt?: string | null;
   createdAt: string;
 }
