@@ -6,6 +6,7 @@ import {
   usersTable,
   workspacesTable,
   workspaceMembersTable,
+  workspaceInvitationsTable,
   brandsTable,
   postsTable,
   postingSchedulesTable,
@@ -190,6 +191,37 @@ async function ensureUser(clerkId: string, email: string) {
       AND b.workspace_id IS NOT NULL
       AND b.user_id = ${user.id}
   `);
+
+  // Auto-accept any pending invitations addressed to this user's email so
+  // teammates invited before signup get instant access.
+  if (user.email) {
+    const pendingInvites = await db
+      .select()
+      .from(workspaceInvitationsTable)
+      .where(
+        and(
+          eq(workspaceInvitationsTable.email, user.email.toLowerCase()),
+          eq(workspaceInvitationsTable.status, "pending"),
+        ),
+      );
+    for (const invite of pendingInvites) {
+      if (invite.expiresAt < new Date()) continue;
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(workspaceMembersTable)
+          .values({
+            workspaceId: invite.workspaceId,
+            userId: user!.id,
+            role: invite.role,
+          })
+          .onConflictDoNothing();
+        await tx
+          .update(workspaceInvitationsTable)
+          .set({ status: "accepted", acceptedAt: new Date() })
+          .where(eq(workspaceInvitationsTable.id, invite.id));
+      });
+    }
+  }
 
   if (!user.activeWorkspaceId) {
     [user] = await db

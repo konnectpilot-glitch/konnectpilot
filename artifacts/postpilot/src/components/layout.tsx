@@ -14,6 +14,7 @@ import {
   Share2,
   Shield,
   ClipboardCheck,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { href: "/posts", label: "Post History", icon: FileText },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/affiliate", label: "Affiliate", icon: DollarSign },
+  { href: "/team", label: "Team", icon: Users },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -22,6 +22,8 @@ import CalendarPage from "@/pages/calendar";
 import LibraryPage from "@/pages/library";
 import AffiliatePage from "@/pages/affiliate";
 import AdminPage from "@/pages/admin";
+import TeamPage from "@/pages/team";
+import InvitePage from "@/pages/invite";
 import FeaturesPage from "@/pages/marketing/features";
 import PricingPage from "@/pages/marketing/pricing";
 import AffiliateLandingPage from "@/pages/marketing/affiliate";
@@ -267,6 +269,8 @@ function ClerkProviderWithRoutes() {
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />
           <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
+          <Route path="/team" component={() => <ProtectedRoute component={TeamPage} />} />
+          <Route path="/invite/:token" component={InvitePage} />
           <Route component={NotFound} />
         </Switch>
         <Toaster />
