@@ -156,25 +156,16 @@ export default function AccountsPage() {
   const [disconnectId, setDisconnectId] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [dialogMode, setDialogMode] = useState<"oauth" | "manual">("oauth");
-  const [manualName, setManualName] = useState("");
-  const [manualHandle, setManualHandle] = useState("");
   const queryClient = useQueryClient();
 
   const closeDialog = () => {
     setConnectDialog(null);
     setConnectError(null);
-    setDialogMode("oauth");
-    setManualName("");
-    setManualHandle("");
   };
 
   const openConnectDialog = (platform: typeof PLATFORMS[0]) => {
     setConnectDialog(platform);
     setConnectError(null);
-    setDialogMode("oauth");
-    setManualName("");
-    setManualHandle("");
   };
 
   const handleAuthorise = async (platform: typeof PLATFORMS[0]) => {
@@ -193,7 +184,7 @@ export default function AccountsPage() {
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "not_configured") {
-          setConnectError(`${platform.label} OAuth login isn't set up yet (it requires platform approval that can take days). Use "Connect manually" below to add your account now and start using KonnectPilot right away.`);
+          setConnectError(`${platform.label} OAuth login isn't set up yet. It requires platform approval that can take a few days — please check back soon.`);
         } else {
           setConnectError(data.error ?? "Something went wrong. Please try again.");
         }
@@ -202,42 +193,6 @@ export default function AccountsPage() {
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch {
-      setConnectError("Network error. Please check your connection and try again.");
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const handleManualConnect = async (platform: typeof PLATFORMS[0]) => {
-    if (!manualName.trim()) {
-      setConnectError("Please enter the account name.");
-      return;
-    }
-    setConnecting(true);
-    setConnectError(null);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${BASE_URL}/api/social-accounts/manual-connect`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          platform: platform.id,
-          accountName: manualName.trim(),
-          accountHandle: manualHandle.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setConnectError(data.error ?? "Failed to add account. Please try again.");
-        return;
-      }
-      toast.success(`${platform.label} account added!`);
-      queryClient.invalidateQueries({ queryKey: ["social-accounts"] });
-      closeDialog();
     } catch {
       setConnectError("Network error. Please check your connection and try again.");
     } finally {
@@ -413,17 +368,14 @@ export default function AccountsPage() {
               {connectDialog?.icon && (
                 <span className="w-6 h-6">{connectDialog.icon}</span>
               )}
-              {dialogMode === "manual" ? `Add ${connectDialog?.label} account` : `Connect ${connectDialog?.label}`}
+              {`Connect ${connectDialog?.label}`}
             </DialogTitle>
             <DialogDescription>
-              {dialogMode === "manual"
-                ? "Add your account details below. You can update these any time."
-                : "Authorise KonnectPilot to publish on your behalf."}
+              Authorise KonnectPilot to publish on your behalf.
             </DialogDescription>
           </DialogHeader>
 
-          {dialogMode === "oauth" ? (
-            <div className="space-y-4 pt-1">
+          <div className="space-y-4 pt-1">
               {connectError ? (
                 <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
                   <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -452,14 +404,6 @@ export default function AccountsPage() {
                     <><ExternalLink className="w-4 h-4 mr-2" />Authorise with {connectDialog?.label}</>
                   )}
                 </Button>
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  disabled={connecting}
-                  onClick={() => { setDialogMode("manual"); setConnectError(null); }}
-                >
-                  Connect manually instead
-                </Button>
                 <Button variant="outline" className="w-full" disabled={connecting} onClick={closeDialog}>
                   {connectError ? "Close" : "Cancel"}
                 </Button>
@@ -476,70 +420,6 @@ export default function AccountsPage() {
                 </a>
               </p>
             </div>
-          ) : (
-            <div className="space-y-4 pt-1">
-              {connectError && (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2 text-sm text-red-700">
-                  <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>{connectError}</span>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Account name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  placeholder={`e.g. ${connectDialog?.label === "Facebook" ? "ClicknKonnect Page" : "ClicknKonnect"}`}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  disabled={connecting}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Handle / Username <span className="text-muted-foreground text-xs">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualHandle}
-                  onChange={(e) => setManualHandle(e.target.value)}
-                  placeholder="@yourhandle"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  disabled={connecting}
-                />
-              </div>
-              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2 text-xs text-amber-800">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  Manual mode lets you organise your accounts in KonnectPilot now.
-                  To enable automatic posting, the {connectDialog?.label} OAuth integration will need to be set up later.
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button
-                  className="w-full"
-                  disabled={connecting || !manualName.trim()}
-                  onClick={() => { if (connectDialog) handleManualConnect(connectDialog); }}
-                >
-                  {connecting ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding…</>
-                  ) : (
-                    <><CheckCircle2 className="w-4 h-4 mr-2" />Add account</>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  disabled={connecting}
-                  onClick={() => { setDialogMode("oauth"); setConnectError(null); }}
-                >
-                  Back
-                </Button>
-              </div>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
 
