@@ -67,6 +67,7 @@ import type {
   TopPost,
   TrackAffiliateClick200,
   TrackClickBody,
+  UndoAiInsight200,
   UpdateAffiliatePayout200,
   UpdateBrandBody,
   UpdatePayoutBody,
@@ -3749,7 +3750,7 @@ export const useDismissAiInsight = <
 };
 
 /**
- * @summary Mark an AI insight as applied and return its action payload
+ * @summary Apply an AI insight by mutating the relevant schedule/brand/post and snapshot prior state for undo
  */
 export const getApplyAiInsightUrl = (id: number) => {
   return `/api/analytics/insights/${id}/apply`;
@@ -3810,7 +3811,7 @@ export type ApplyAiInsightMutationResult = NonNullable<
 export type ApplyAiInsightMutationError = ErrorType<unknown>;
 
 /**
- * @summary Mark an AI insight as applied and return its action payload
+ * @summary Apply an AI insight by mutating the relevant schedule/brand/post and snapshot prior state for undo
  */
 export const useApplyAiInsight = <
   TError = ErrorType<unknown>,
@@ -3830,6 +3831,90 @@ export const useApplyAiInsight = <
   TContext
 > => {
   return useMutation(getApplyAiInsightMutationOptions(options));
+};
+
+/**
+ * @summary Undo a recently applied insight (within the 24h window)
+ */
+export const getUndoAiInsightUrl = (id: number) => {
+  return `/api/analytics/insights/${id}/undo`;
+};
+
+export const undoAiInsight = async (
+  id: number,
+  options?: RequestInit,
+): Promise<UndoAiInsight200> => {
+  return customFetch<UndoAiInsight200>(getUndoAiInsightUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getUndoAiInsightMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof undoAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof undoAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["undoAiInsight"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof undoAiInsight>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return undoAiInsight(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UndoAiInsightMutationResult = NonNullable<
+  Awaited<ReturnType<typeof undoAiInsight>>
+>;
+
+export type UndoAiInsightMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Undo a recently applied insight (within the 24h window)
+ */
+export const useUndoAiInsight = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof undoAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof undoAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getUndoAiInsightMutationOptions(options));
 };
 
 /**

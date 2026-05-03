@@ -795,10 +795,23 @@ export type DismissAiInsight200 = {
  */
 export type ApplyAiInsight200Payload = { [key: string]: unknown } | null;
 
+export type ApplyAiInsight200Applied = {
+  kind: string;
+  summary: string;
+};
+
 export type ApplyAiInsight200 = {
   ok: boolean;
   /** @nullable */
   payload?: ApplyAiInsight200Payload;
+  applied?: ApplyAiInsight200Applied;
+  canUndo?: boolean;
+  undoExpiresAt?: string;
+};
+
+export type UndoAiInsight200 = {
+  ok: boolean;
+  restored?: boolean;
 };
 
 export type GenerateAnalyticsReportBodyPeriod =

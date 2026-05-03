@@ -4,6 +4,7 @@ import {
   db,
   brandsTable,
   postsTable,
+  postingSchedulesTable,
   postMetricsSnapshotsTable,
   brandDailyAggregatesTable,
   followerHistoryTable,
@@ -301,18 +302,221 @@ router.post("/analytics/insights/:id/dismiss", requireAuth, requireWorkspace, as
   res.json({ ok: true });
 });
 
+const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function uniq<T>(xs: T[]): T[] {
+  return Array.from(new Set(xs));
+}
+
+function hoursToTimes(hours: number[]): string[] {
+  return uniq(
+    hours
+      .filter((h) => Number.isFinite(h) && h >= 0 && h < 24)
+      .map((h) => `${String(Math.floor(h)).padStart(2, "0")}:00`),
+  ).sort();
+}
+
 router.post("/analytics/insights/:id/apply", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   if (!hasRoleAtLeast(req.workspaceRole, "editor")) { res.status(403).json({ error: "Editor role required" }); return; }
-  const [insight] = await db
+  const [row] = await db
+    .select({ insight: aiInsightsTable, brand: brandsTable })
+    .from(aiInsightsTable)
+    .innerJoin(brandsTable, eq(brandsTable.id, aiInsightsTable.brandId))
+    .where(and(eq(aiInsightsTable.id, id), eq(brandsTable.workspaceId, req.workspaceId)));
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if (row.insight.appliedAt) { res.status(409).json({ error: "Already applied" }); return; }
+
+  const insight = row.insight;
+  const brand = row.brand;
+  const payload = (insight.payload ?? {}) as Record<string, unknown>;
+  let undoSnapshot: Record<string, unknown> | null = null;
+  let applied: { kind: string; summary: string } = { kind: insight.kind, summary: "Marked as applied" };
+
+  try {
+    if (insight.kind === "best_time") {
+      const byPlatform = (payload.bestHoursByPlatform ?? {}) as Record<string, number[]>;
+      const allHours: number[] = [];
+      for (const hs of Object.values(byPlatform)) if (Array.isArray(hs)) allHours.push(...hs.map((h) => Number(h)));
+      const newTimes = hoursToTimes(allHours);
+      if (newTimes.length === 0) { res.status(400).json({ error: "No best hours in payload" }); return; }
+      const schedules = await db
+        .select()
+        .from(postingSchedulesTable)
+        .where(and(eq(postingSchedulesTable.brandId, brand.id), eq(postingSchedulesTable.isActive, true)));
+      undoSnapshot = {
+        brand: { id: brand.id, postTime: brand.postTime },
+        schedules: schedules.map((s) => ({ id: s.id, postTimes: s.postTimes })),
+      };
+      for (const s of schedules) {
+        await db.update(postingSchedulesTable).set({ postTimes: newTimes }).where(eq(postingSchedulesTable.id, s.id));
+      }
+      await db.update(brandsTable).set({ postTime: newTimes[0] }).where(eq(brandsTable.id, brand.id));
+      applied = {
+        kind: insight.kind,
+        summary: `Updated ${schedules.length} schedule(s) to post at ${newTimes.join(", ")} (UTC).`,
+      };
+    } else if (insight.kind === "hashtag_swap") {
+      const tags = Array.isArray(payload.hashtags) ? (payload.hashtags as unknown[]).map(String) : [];
+      const cleaned = uniq(tags.map((t) => t.trim()).filter(Boolean));
+      if (cleaned.length === 0) { res.status(400).json({ error: "No hashtags in payload" }); return; }
+      undoSnapshot = { brand: { id: brand.id, keywords: brand.keywords } };
+      const existing = uniq(
+        String(brand.keywords ?? "")
+          .split(/[,\n]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const merged = uniq([...existing, ...cleaned]);
+      await db.update(brandsTable).set({ keywords: merged.join(", ") }).where(eq(brandsTable.id, brand.id));
+      applied = { kind: insight.kind, summary: `Added ${cleaned.length} hashtag(s) to brand keywords.` };
+    } else if (insight.kind === "caption_rewrite") {
+      const suggested = typeof payload.suggestedContent === "string" ? payload.suggestedContent : "";
+      const originalPostId = Number(payload.originalPostId ?? insight.postId ?? 0);
+      if (!suggested || !Number.isInteger(originalPostId) || originalPostId <= 0) {
+        res.status(400).json({ error: "Missing suggested content or post id" }); return;
+      }
+      const [target] = await db
+        .select()
+        .from(postsTable)
+        .where(and(eq(postsTable.id, originalPostId), eq(postsTable.workspaceId, req.workspaceId)));
+      if (!target) { res.status(404).json({ error: "Target post not found" }); return; }
+      if (target.status === "published") { res.status(409).json({ error: "Cannot edit a published post" }); return; }
+      undoSnapshot = { post: { id: target.id, content: target.content } };
+      await db.update(postsTable).set({ content: suggested }).where(eq(postsTable.id, target.id));
+      applied = { kind: insight.kind, summary: `Updated caption on post #${target.id}.` };
+    } else if (insight.kind === "content_mix") {
+      const byPlatform = (payload.bestContentTypesByPlatform ?? {}) as Record<string, string[]>;
+      const lines = Object.entries(byPlatform)
+        .map(([p, types]) => `- ${p}: prefer ${(types as string[]).slice(0, 3).join(", ")}`)
+        .join("\n");
+      if (!lines) { res.status(400).json({ error: "No content types in payload" }); return; }
+      const guidance = `\n\n[Performance hint] Favor these content types:\n${lines}`;
+      const schedules = await db
+        .select()
+        .from(postingSchedulesTable)
+        .where(and(eq(postingSchedulesTable.brandId, brand.id), eq(postingSchedulesTable.isActive, true)));
+      undoSnapshot = {
+        schedules: schedules.map((s) => ({ id: s.id, contentPrompt: s.contentPrompt })),
+      };
+      for (const s of schedules) {
+        const prev = s.contentPrompt ?? "";
+        if (!prev.includes("[Performance hint]")) {
+          await db
+            .update(postingSchedulesTable)
+            .set({ contentPrompt: prev + guidance })
+            .where(eq(postingSchedulesTable.id, s.id));
+        }
+      }
+      applied = { kind: insight.kind, summary: `Added content-mix guidance to ${schedules.length} schedule(s).` };
+    } else if (insight.kind === "seo_blog") {
+      const targetKeywords = Array.isArray(payload.targetKeywords)
+        ? (payload.targetKeywords as unknown[]).map(String).map((s) => s.trim()).filter(Boolean)
+        : [];
+      if (targetKeywords.length === 0) { res.status(400).json({ error: "No target keywords in payload" }); return; }
+      undoSnapshot = { brand: { id: brand.id, keywords: brand.keywords } };
+      const existing = uniq(
+        String(brand.keywords ?? "")
+          .split(/[,\n]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const merged = uniq([...existing, ...targetKeywords]);
+      await db.update(brandsTable).set({ keywords: merged.join(", ") }).where(eq(brandsTable.id, brand.id));
+      applied = { kind: insight.kind, summary: `Added ${targetKeywords.length} SEO keyword(s) to brand.` };
+    } else {
+      res.status(400).json({ error: `Insight kind "${insight.kind}" is not applicable` }); return;
+    }
+  } catch (err: any) {
+    logger.warn({ err: err?.message, insightId: id }, "Apply insight failed");
+    res.status(500).json({ error: "Failed to apply insight" }); return;
+  }
+
+  await db
+    .update(aiInsightsTable)
+    .set({ appliedAt: new Date(), undoPayload: undoSnapshot ?? undefined })
+    .where(eq(aiInsightsTable.id, id));
+
+  res.json({
+    ok: true,
+    payload: insight.payload ?? null,
+    applied,
+    canUndo: undoSnapshot !== null,
+    undoExpiresAt: new Date(Date.now() + UNDO_WINDOW_MS).toISOString(),
+  });
+});
+
+router.post("/analytics/insights/:id/undo", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (!hasRoleAtLeast(req.workspaceRole, "editor")) { res.status(403).json({ error: "Editor role required" }); return; }
+  const [row] = await db
     .select({ insight: aiInsightsTable })
     .from(aiInsightsTable)
     .innerJoin(brandsTable, eq(brandsTable.id, aiInsightsTable.brandId))
     .where(and(eq(aiInsightsTable.id, id), eq(brandsTable.workspaceId, req.workspaceId)));
-  if (!insight) { res.status(404).json({ error: "Not found" }); return; }
-  await db.update(aiInsightsTable).set({ appliedAt: new Date() }).where(eq(aiInsightsTable.id, id));
-  res.json({ ok: true, payload: insight.insight.payload ?? null });
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const insight = row.insight;
+  if (!insight.appliedAt) { res.status(409).json({ error: "Insight is not applied" }); return; }
+  if (Date.now() - insight.appliedAt.getTime() > UNDO_WINDOW_MS) {
+    res.status(410).json({ error: "Undo window has expired" }); return;
+  }
+  const snap: unknown = insight.undoPayload ?? null;
+  if (!snap || typeof snap !== "object") {
+    await db.update(aiInsightsTable).set({ appliedAt: null }).where(eq(aiInsightsTable.id, id));
+    res.json({ ok: true, restored: false });
+    return;
+  }
+  const snapObj = snap as Record<string, unknown>;
+
+  function asRecord(v: unknown): Record<string, unknown> | null {
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  }
+  function asStringArray(v: unknown): string[] | null {
+    return Array.isArray(v) && v.every((x) => typeof x === "string") ? (v as string[]) : null;
+  }
+
+  try {
+    const brandSnap = asRecord(snapObj.brand);
+    if (brandSnap) {
+      const patch: { postTime?: string; keywords?: string } = {};
+      if (typeof brandSnap.postTime === "string") patch.postTime = brandSnap.postTime;
+      if (typeof brandSnap.keywords === "string") patch.keywords = brandSnap.keywords;
+      if (Object.keys(patch).length > 0 && typeof brandSnap.id === "number") {
+        await db.update(brandsTable).set(patch).where(eq(brandsTable.id, brandSnap.id));
+      }
+    }
+    if (Array.isArray(snapObj.schedules)) {
+      for (const item of snapObj.schedules) {
+        const s = asRecord(item);
+        if (!s || typeof s.id !== "number") continue;
+        const patch: { postTimes?: string[]; contentPrompt?: string | null } = {};
+        const times = asStringArray(s.postTimes);
+        if (times) patch.postTimes = times;
+        if ("contentPrompt" in s) {
+          const cp = s.contentPrompt;
+          if (cp === null || typeof cp === "string") patch.contentPrompt = cp;
+        }
+        if (Object.keys(patch).length > 0) {
+          await db.update(postingSchedulesTable).set(patch).where(eq(postingSchedulesTable.id, s.id));
+        }
+      }
+    }
+    const postSnap = asRecord(snapObj.post);
+    if (postSnap && typeof postSnap.id === "number" && typeof postSnap.content === "string") {
+      await db.update(postsTable).set({ content: postSnap.content }).where(eq(postsTable.id, postSnap.id));
+    }
+  } catch (err: any) {
+    logger.warn({ err: err?.message, insightId: id }, "Undo insight failed");
+    res.status(500).json({ error: "Failed to undo insight" }); return;
+  }
+
+  await db
+    .update(aiInsightsTable)
+    .set({ appliedAt: null, undoPayload: null })
+    .where(eq(aiInsightsTable.id, id));
+  res.json({ ok: true, restored: true });
 });
 
 // ---------- Performance memory ----------

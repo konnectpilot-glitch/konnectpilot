@@ -5,10 +5,14 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ApplyAiInsight200Applied } from "./applyAiInsight200Applied";
 import type { ApplyAiInsight200Payload } from "./applyAiInsight200Payload";
 
 export type ApplyAiInsight200 = {
   ok: boolean;
   /** @nullable */
   payload?: ApplyAiInsight200Payload;
+  applied?: ApplyAiInsight200Applied;
+  canUndo?: boolean;
+  undoExpiresAt?: string;
 };

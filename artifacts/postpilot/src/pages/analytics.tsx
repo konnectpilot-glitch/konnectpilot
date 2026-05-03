@@ -11,6 +11,7 @@ import {
   useRefreshAiInsights,
   useDismissAiInsight,
   useApplyAiInsight,
+  useUndoAiInsight,
   useGenerateAnalyticsReport,
   useCompareAnalyticsPosts,
   getListAiInsightsQueryKey,
@@ -243,14 +244,33 @@ export default function AnalyticsPage() {
       },
     },
   });
+  const [recentlyApplied, setRecentlyApplied] = useState<Record<number, number>>({});
   const apply = useApplyAiInsight({
     mutation: {
-      onSuccess: () => {
-        toast.success("Recommendation applied — generator will use it on the next post.");
+      onSuccess: (r, vars) => {
+        toast.success(r.applied?.summary ?? "Recommendation applied.");
+        setRecentlyApplied((m) => ({ ...m, [vars.id]: Date.now() }));
+        if (activeBrandId) {
+          queryClient.invalidateQueries({ queryKey: getListAiInsightsQueryKey(activeBrandId) });
+          queryClient.invalidateQueries({ queryKey: getGetPerformanceMemoryQueryKey(activeBrandId) });
+        }
+      },
+      onError: (err: Error) => toast.error(err?.message ?? "Failed to apply"),
+    },
+  });
+  const undo = useUndoAiInsight({
+    mutation: {
+      onSuccess: (_r, vars) => {
+        toast.success("Reverted.");
+        setRecentlyApplied((m) => {
+          const n = { ...m };
+          delete n[vars.id];
+          return n;
+        });
         if (activeBrandId)
           queryClient.invalidateQueries({ queryKey: getListAiInsightsQueryKey(activeBrandId) });
       },
-      onError: (err: Error) => toast.error(err?.message ?? "Failed to apply"),
+      onError: (err: Error) => toast.error(err?.message ?? "Failed to undo"),
     },
   });
   const report = useGenerateAnalyticsReport({
@@ -574,15 +594,38 @@ export default function AnalyticsPage() {
                             </p>
                           )}
                         </div>
-                        {!i.appliedAt && (
-                          <button
-                            onClick={() => apply.mutate({ id: i.id })}
-                            className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:opacity-90"
-                            data-testid={`apply-${i.id}`}
-                          >
-                            Apply
-                          </button>
-                        )}
+                        {(() => {
+                          const appliedAtMs = i.appliedAt
+                            ? new Date(i.appliedAt).getTime()
+                            : recentlyApplied[i.id] ?? null;
+                          const withinUndoWindow =
+                            appliedAtMs !== null && Date.now() - appliedAtMs < 24 * 60 * 60 * 1000;
+                          if (appliedAtMs && withinUndoWindow) {
+                            return (
+                              <button
+                                onClick={() => undo.mutate({ id: i.id })}
+                                disabled={undo.isPending}
+                                className="text-xs px-2 py-1 rounded border border-border hover:bg-secondary"
+                                data-testid={`undo-${i.id}`}
+                              >
+                                Undo
+                              </button>
+                            );
+                          }
+                          if (!appliedAtMs) {
+                            return (
+                              <button
+                                onClick={() => apply.mutate({ id: i.id })}
+                                disabled={apply.isPending}
+                                className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:opacity-90"
+                                data-testid={`apply-${i.id}`}
+                              >
+                                Apply
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
                         <button
                           onClick={() => dismiss.mutate({ id: i.id })}
                           className="p-1 text-muted-foreground hover:text-foreground"

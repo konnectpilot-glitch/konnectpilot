@@ -155,6 +155,9 @@ export const aiInsightsTable = pgTable(
     body: text("body").notNull(),
     // Structured payload the UI/generator can apply (e.g. suggested caption text).
     payload: jsonb("payload").$type<Record<string, unknown>>(),
+    // Snapshot of the affected resource captured immediately before apply,
+    // used by the /undo endpoint within 24h to restore previous state.
+    undoPayload: jsonb("undo_payload").$type<Record<string, unknown>>(),
     dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

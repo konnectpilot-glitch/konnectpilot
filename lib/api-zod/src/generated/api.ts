@@ -875,7 +875,7 @@ export const DismissAiInsightResponse = zod.object({
 });
 
 /**
- * @summary Mark an AI insight as applied and return its action payload
+ * @summary Apply an AI insight by mutating the relevant schedule/brand/post and snapshot prior state for undo
  */
 export const ApplyAiInsightParams = zod.object({
   id: zod.coerce.number(),
@@ -884,6 +884,26 @@ export const ApplyAiInsightParams = zod.object({
 export const ApplyAiInsightResponse = zod.object({
   ok: zod.boolean(),
   payload: zod.record(zod.string(), zod.unknown()).nullish(),
+  applied: zod
+    .object({
+      kind: zod.string(),
+      summary: zod.string(),
+    })
+    .optional(),
+  canUndo: zod.boolean().optional(),
+  undoExpiresAt: zod.string().optional(),
+});
+
+/**
+ * @summary Undo a recently applied insight (within the 24h window)
+ */
+export const UndoAiInsightParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UndoAiInsightResponse = zod.object({
+  ok: zod.boolean(),
+  restored: zod.boolean().optional(),
 });
 
 /**

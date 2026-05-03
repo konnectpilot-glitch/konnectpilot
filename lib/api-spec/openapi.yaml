@@ -1113,7 +1113,7 @@ paths:
     post:
       operationId: applyAiInsight
       tags: [analytics]
-      summary: Mark an AI insight as applied and return its action payload
+      summary: Apply an AI insight by mutating the relevant schedule/brand/post and snapshot prior state for undo
       security: [{ clerkAuth: [] }]
       parameters:
         - in: path
@@ -1130,6 +1130,37 @@ paths:
                 properties:
                   ok: { type: boolean }
                   payload: { type: ["object", "null"], additionalProperties: true }
+                  applied:
+                    type: object
+                    properties:
+                      kind: { type: string }
+                      summary: { type: string }
+                    required: [kind, summary]
+                  canUndo: { type: boolean }
+                  undoExpiresAt: { type: string }
+                required: [ok]
+
+  /analytics/insights/{id}/undo:
+    post:
+      operationId: undoAiInsight
+      tags: [analytics]
+      summary: Undo a recently applied insight (within the 24h window)
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  restored: { type: boolean }
                 required: [ok]
 
   /analytics/brands/{id}/performance-memory:
