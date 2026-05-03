@@ -16,6 +16,7 @@ import {
 } from "@workspace/api-zod";
 import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
 import { buildBrandMemoryContext, aiBrandReview, recordFeedback } from "../lib/brand-memory";
+import { buildPerformanceMemoryContext } from "../lib/performance-memory";
 import { retryPost } from "../lib/scheduler";
 import { logger } from "../lib/logger";
 
@@ -97,7 +98,11 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
   }
 
   const start = startDate ? new Date(startDate) : new Date();
-  const brandMemory = await buildBrandMemoryContext(brandId);
+  const [bm, pm] = await Promise.all([
+    buildBrandMemoryContext(brandId),
+    buildPerformanceMemoryContext(brandId),
+  ]);
+  const brandMemory = bm + pm;
 
   let created = 0;
   let autoApproved = 0;

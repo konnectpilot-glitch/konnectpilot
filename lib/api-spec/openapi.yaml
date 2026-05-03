@@ -28,6 +28,8 @@ tags:
     description: Super-admin operations
   - name: affiliate
     description: Affiliate program tracking and payouts
+  - name: analytics
+    description: Performance analytics, AI insights, and growth recommendations
 
 paths:
   /healthz:
@@ -926,6 +928,297 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /analytics/brands/{id}/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Brand-level KPI summary with previous-period comparison
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: range
+          schema: { type: string, enum: ["7d", "30d", "90d"] }
+        - in: query
+          name: platform
+          schema: { type: string }
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyticsSummary" }
+
+  /analytics/brands/{id}/timeseries:
+    get:
+      operationId: getAnalyticsTimeseries
+      tags: [analytics]
+      summary: Daily engagement and follower time series
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: range
+          schema: { type: string, enum: ["7d", "30d", "90d"] }
+        - in: query
+          name: platform
+          schema: { type: string }
+      responses:
+        "200":
+          description: Series
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyticsTimeseries" }
+
+  /analytics/brands/{id}/top-posts:
+    get:
+      operationId: getAnalyticsTopPosts
+      tags: [analytics]
+      summary: Best-performing posts ranked by engagement score
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: range
+          schema: { type: string }
+        - in: query
+          name: platform
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        "200":
+          description: Top posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TopPost" }
+
+  /analytics/posts/compare:
+    get:
+      operationId: compareAnalyticsPosts
+      tags: [analytics]
+      summary: Side-by-side metrics for two posts
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: query
+          name: a
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: b
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Comparison
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostComparison" }
+
+  /analytics/brands/{id}/recommendations:
+    get:
+      operationId: getAnalyticsRecommendations
+      tags: [analytics]
+      summary: Best posting hours, content types, hashtags, hooks
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Recommendations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyticsRecommendations" }
+
+  /analytics/brands/{id}/insights:
+    get:
+      operationId: listAiInsights
+      tags: [analytics]
+      summary: List active AI insights for a brand
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AiInsight" }
+
+  /analytics/brands/{id}/insights/refresh:
+    post:
+      operationId: refreshAiInsights
+      tags: [analytics]
+      summary: Recompute Performance Memory and generate new AI insights
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                required: [created]
+
+  /analytics/insights/{id}/dismiss:
+    post:
+      operationId: dismissAiInsight
+      tags: [analytics]
+      summary: Dismiss an AI insight
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                required: [ok]
+
+  /analytics/insights/{id}/apply:
+    post:
+      operationId: applyAiInsight
+      tags: [analytics]
+      summary: Mark an AI insight as applied and return its action payload
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  payload: { type: ["object", "null"], additionalProperties: true }
+                required: [ok]
+
+  /analytics/brands/{id}/performance-memory:
+    get:
+      operationId: getPerformanceMemory
+      tags: [analytics]
+      summary: Distilled Performance Memory for a brand
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Performance memory
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PerformanceMemory" }
+
+  /analytics/brands/{id}/reports:
+    get:
+      operationId: listAnalyticsReports
+      tags: [analytics]
+      summary: List analytics reports for a brand
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AnalyticsReport" }
+    post:
+      operationId: generateAnalyticsReport
+      tags: [analytics]
+      summary: Generate a weekly or monthly performance report
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period: { type: string, enum: [weekly, monthly] }
+                emailOptIn: { type: boolean }
+              required: [period]
+      responses:
+        "201":
+          description: Report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyticsReport" }
+
+  /analytics/brands/{id}/seo:
+    post:
+      operationId: generateAnalyticsSeo
+      tags: [analytics]
+      summary: Generate SEO recommendations for a blog draft, persisted as ai_insights
+      security: [{ clerkAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeoRecommendationsRequest" }
+      responses:
+        "200":
+          description: SEO recommendations created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeoRecommendationsResponse" }
+
 components:
   securitySchemes:
     clerkAuth:
@@ -933,6 +1226,198 @@ components:
       scheme: bearer
 
   schemas:
+    AnalyticsSummary:
+      type: object
+      properties:
+        brandId: { type: integer }
+        range: { type: integer }
+        platform: { type: ["string", "null"] }
+        impressions: { type: integer }
+        reach: { type: integer }
+        likes: { type: integer }
+        comments: { type: integer }
+        shares: { type: integer }
+        clicks: { type: integer }
+        engagementRate: { type: number }
+        ctr: { type: number, description: "Click-through rate = clicks / impressions" }
+        prev:
+          type: object
+          properties:
+            impressions: { type: integer }
+            reach: { type: integer }
+            likes: { type: integer }
+            engagementRate: { type: number }
+            ctr: { type: number }
+          required: [impressions, reach, likes, engagementRate, ctr]
+        followers:
+          type: object
+          properties:
+            latest: { type: integer }
+            min: { type: integer }
+            max: { type: integer }
+            delta: { type: integer }
+          required: [latest, min, max, delta]
+      required: [brandId, range, impressions, reach, likes, comments, shares, clicks, engagementRate, ctr, prev, followers]
+
+    SeoRecommendationsRequest:
+      type: object
+      properties:
+        topic: { type: string }
+        draft: { type: string }
+
+    SeoRecommendationsResponse:
+      type: object
+      properties:
+        created: { type: integer }
+      required: [created]
+
+    AnalyticsTimeseries:
+      type: object
+      properties:
+        range: { type: integer }
+        platform: { type: ["string", "null"] }
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              day: { type: string }
+              impressions: { type: integer }
+              reach: { type: integer }
+              likes: { type: integer }
+              comments: { type: integer }
+              shares: { type: integer }
+              engagementRate: { type: number }
+            required: [day, impressions, reach, likes, comments, shares, engagementRate]
+        followers:
+          type: array
+          items:
+            type: object
+            properties:
+              day: { type: string }
+              followers: { type: integer }
+            required: [day, followers]
+      required: [range, points, followers]
+
+    TopPost:
+      type: object
+      properties:
+        postId: { type: integer }
+        platform: { type: string }
+        content: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        publishedAt: { type: ["string", "null"] }
+        score: { type: number }
+        impressions: { type: integer }
+        reach: { type: integer }
+        likes: { type: integer }
+        comments: { type: integer }
+        shares: { type: integer }
+        engagementRate: { type: number }
+      required: [postId, platform, content, score, impressions, reach, likes, comments, shares, engagementRate]
+
+    PostComparison:
+      type: object
+      properties:
+        a:
+          type: object
+          properties:
+            post: { type: object, additionalProperties: true }
+            metrics: { type: ["object", "null"], additionalProperties: true }
+          required: [post]
+        b:
+          type: object
+          properties:
+            post: { type: object, additionalProperties: true }
+            metrics: { type: ["object", "null"], additionalProperties: true }
+          required: [post]
+      required: [a, b]
+
+    AnalyticsRecommendations:
+      type: object
+      properties:
+        bestHoursByPlatform:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: integer }
+        bestContentTypesByPlatform:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+        winningHashtags:
+          type: array
+          items: { type: string }
+        winningHookTemplates:
+          type: array
+          items: { type: string }
+      required: [bestHoursByPlatform, bestContentTypesByPlatform, winningHashtags, winningHookTemplates]
+
+    AiInsight:
+      type: object
+      properties:
+        id: { type: integer }
+        brandId: { type: integer }
+        postId: { type: ["integer", "null"] }
+        kind: { type: string }
+        severity: { type: string }
+        title: { type: string }
+        body: { type: string }
+        payload: { type: ["object", "null"], additionalProperties: true }
+        createdAt: { type: string }
+        appliedAt: { type: ["string", "null"] }
+      required: [id, brandId, kind, severity, title, body, createdAt]
+
+    PerformanceMemory:
+      type: object
+      properties:
+        brandId: { type: integer }
+        topExemplars:
+          type: array
+          items:
+            type: object
+            properties:
+              postId: { type: integer }
+              platform: { type: string }
+              content: { type: string }
+              score: { type: number }
+            required: [postId, platform, content, score]
+        bestHoursByPlatform:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: integer }
+        bestContentTypesByPlatform:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+        winningHashtags:
+          type: array
+          items: { type: string }
+        winningHookTemplates:
+          type: array
+          items: { type: string }
+        distilledStrategy: { type: ["string", "null"] }
+        samplesAnalyzed: { type: integer }
+        lastDistilledAt: { type: ["string", "null"] }
+        updatedAt: { type: string }
+      required: [brandId, topExemplars, bestHoursByPlatform, bestContentTypesByPlatform, winningHashtags, winningHookTemplates, samplesAnalyzed, updatedAt]
+
+    AnalyticsReport:
+      type: object
+      properties:
+        id: { type: integer }
+        brandId: { type: integer }
+        period: { type: string }
+        periodStart: { type: string }
+        periodEnd: { type: string }
+        summary: { type: object, additionalProperties: true }
+        html: { type: string }
+        createdAt: { type: string }
+      required: [id, brandId, period, periodStart, periodEnd, summary, createdAt]
+
     HealthStatus:
       type: object
       properties:

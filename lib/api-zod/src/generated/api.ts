@@ -681,3 +681,277 @@ export const GetBrandsIdMemoryResponse = zod.object({
   editedCount: zod.number(),
   updatedAt: zod.string(),
 });
+
+/**
+ * @summary Brand-level KPI summary with previous-period comparison
+ */
+export const GetAnalyticsSummaryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAnalyticsSummaryQueryParams = zod.object({
+  range: zod.enum(["7d", "30d", "90d"]).optional(),
+  platform: zod.coerce.string().optional(),
+});
+
+export const GetAnalyticsSummaryResponse = zod.object({
+  brandId: zod.number(),
+  range: zod.number(),
+  platform: zod.string().nullish(),
+  impressions: zod.number(),
+  reach: zod.number(),
+  likes: zod.number(),
+  comments: zod.number(),
+  shares: zod.number(),
+  clicks: zod.number(),
+  engagementRate: zod.number(),
+  ctr: zod.number().describe("Click-through rate = clicks \/ impressions"),
+  prev: zod.object({
+    impressions: zod.number(),
+    reach: zod.number(),
+    likes: zod.number(),
+    engagementRate: zod.number(),
+    ctr: zod.number(),
+  }),
+  followers: zod.object({
+    latest: zod.number(),
+    min: zod.number(),
+    max: zod.number(),
+    delta: zod.number(),
+  }),
+});
+
+/**
+ * @summary Daily engagement and follower time series
+ */
+export const GetAnalyticsTimeseriesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAnalyticsTimeseriesQueryParams = zod.object({
+  range: zod.enum(["7d", "30d", "90d"]).optional(),
+  platform: zod.coerce.string().optional(),
+});
+
+export const GetAnalyticsTimeseriesResponse = zod.object({
+  range: zod.number(),
+  platform: zod.string().nullish(),
+  points: zod.array(
+    zod.object({
+      day: zod.string(),
+      impressions: zod.number(),
+      reach: zod.number(),
+      likes: zod.number(),
+      comments: zod.number(),
+      shares: zod.number(),
+      engagementRate: zod.number(),
+    }),
+  ),
+  followers: zod.array(
+    zod.object({
+      day: zod.string(),
+      followers: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Best-performing posts ranked by engagement score
+ */
+export const GetAnalyticsTopPostsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const getAnalyticsTopPostsQueryLimitMax = 50;
+
+export const GetAnalyticsTopPostsQueryParams = zod.object({
+  range: zod.coerce.string().optional(),
+  platform: zod.coerce.string().optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getAnalyticsTopPostsQueryLimitMax)
+    .optional(),
+});
+
+export const GetAnalyticsTopPostsResponseItem = zod.object({
+  postId: zod.number(),
+  platform: zod.string(),
+  content: zod.string(),
+  imageUrl: zod.string().nullish(),
+  publishedAt: zod.string().nullish(),
+  score: zod.number(),
+  impressions: zod.number(),
+  reach: zod.number(),
+  likes: zod.number(),
+  comments: zod.number(),
+  shares: zod.number(),
+  engagementRate: zod.number(),
+});
+export const GetAnalyticsTopPostsResponse = zod.array(
+  GetAnalyticsTopPostsResponseItem,
+);
+
+/**
+ * @summary Side-by-side metrics for two posts
+ */
+export const CompareAnalyticsPostsQueryParams = zod.object({
+  a: zod.coerce.number(),
+  b: zod.coerce.number(),
+});
+
+export const CompareAnalyticsPostsResponse = zod.object({
+  a: zod.object({
+    post: zod.record(zod.string(), zod.unknown()),
+    metrics: zod.record(zod.string(), zod.unknown()).nullish(),
+  }),
+  b: zod.object({
+    post: zod.record(zod.string(), zod.unknown()),
+    metrics: zod.record(zod.string(), zod.unknown()).nullish(),
+  }),
+});
+
+/**
+ * @summary Best posting hours, content types, hashtags, hooks
+ */
+export const GetAnalyticsRecommendationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAnalyticsRecommendationsResponse = zod.object({
+  bestHoursByPlatform: zod.record(zod.string(), zod.array(zod.number())),
+  bestContentTypesByPlatform: zod.record(zod.string(), zod.array(zod.string())),
+  winningHashtags: zod.array(zod.string()),
+  winningHookTemplates: zod.array(zod.string()),
+});
+
+/**
+ * @summary List active AI insights for a brand
+ */
+export const ListAiInsightsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListAiInsightsResponseItem = zod.object({
+  id: zod.number(),
+  brandId: zod.number(),
+  postId: zod.number().nullish(),
+  kind: zod.string(),
+  severity: zod.string(),
+  title: zod.string(),
+  body: zod.string(),
+  payload: zod.record(zod.string(), zod.unknown()).nullish(),
+  createdAt: zod.string(),
+  appliedAt: zod.string().nullish(),
+});
+export const ListAiInsightsResponse = zod.array(ListAiInsightsResponseItem);
+
+/**
+ * @summary Recompute Performance Memory and generate new AI insights
+ */
+export const RefreshAiInsightsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RefreshAiInsightsResponse = zod.object({
+  created: zod.number(),
+});
+
+/**
+ * @summary Dismiss an AI insight
+ */
+export const DismissAiInsightParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DismissAiInsightResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Mark an AI insight as applied and return its action payload
+ */
+export const ApplyAiInsightParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApplyAiInsightResponse = zod.object({
+  ok: zod.boolean(),
+  payload: zod.record(zod.string(), zod.unknown()).nullish(),
+});
+
+/**
+ * @summary Distilled Performance Memory for a brand
+ */
+export const GetPerformanceMemoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPerformanceMemoryResponse = zod.object({
+  brandId: zod.number(),
+  topExemplars: zod.array(
+    zod.object({
+      postId: zod.number(),
+      platform: zod.string(),
+      content: zod.string(),
+      score: zod.number(),
+    }),
+  ),
+  bestHoursByPlatform: zod.record(zod.string(), zod.array(zod.number())),
+  bestContentTypesByPlatform: zod.record(zod.string(), zod.array(zod.string())),
+  winningHashtags: zod.array(zod.string()),
+  winningHookTemplates: zod.array(zod.string()),
+  distilledStrategy: zod.string().nullish(),
+  samplesAnalyzed: zod.number(),
+  lastDistilledAt: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary List analytics reports for a brand
+ */
+export const ListAnalyticsReportsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListAnalyticsReportsResponseItem = zod.object({
+  id: zod.number(),
+  brandId: zod.number(),
+  period: zod.string(),
+  periodStart: zod.string(),
+  periodEnd: zod.string(),
+  summary: zod.record(zod.string(), zod.unknown()),
+  html: zod.string().optional(),
+  createdAt: zod.string(),
+});
+export const ListAnalyticsReportsResponse = zod.array(
+  ListAnalyticsReportsResponseItem,
+);
+
+/**
+ * @summary Generate a weekly or monthly performance report
+ */
+export const GenerateAnalyticsReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GenerateAnalyticsReportBody = zod.object({
+  period: zod.enum(["weekly", "monthly"]),
+  emailOptIn: zod.boolean().optional(),
+});
+
+/**
+ * @summary Generate SEO recommendations for a blog draft, persisted as ai_insights
+ */
+export const GenerateAnalyticsSeoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GenerateAnalyticsSeoBody = zod.object({
+  topic: zod.string().optional(),
+  draft: zod.string().optional(),
+});
+
+export const GenerateAnalyticsSeoResponse = zod.object({
+  created: zod.number(),
+});

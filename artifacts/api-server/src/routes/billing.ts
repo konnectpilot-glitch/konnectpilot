@@ -267,8 +267,13 @@ router.post("/billing/webhooks", async (req: any, res): Promise<void> => {
     }
     case "charge.refunded": {
       const charge = event.data.object as Stripe.Charge;
+      const chargeInvoice = (charge as unknown as { invoice?: string | { id?: string } | null }).invoice;
       const invoiceId =
-        typeof charge.invoice === "string" ? charge.invoice : charge.invoice?.id;
+        typeof chargeInvoice === "string"
+          ? chargeInvoice
+          : chargeInvoice && typeof chargeInvoice === "object"
+            ? chargeInvoice.id
+            : undefined;
       if (!invoiceId) break;
       await db
         .update(affiliateCommissionsTable)

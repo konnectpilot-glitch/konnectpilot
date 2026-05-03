@@ -9,3 +9,4 @@ export * from "./affiliates";
 export * from "./post-comments";
 export * from "./brand-memory";
 export * from "./workspace-invitations";
+export * from "./analytics";

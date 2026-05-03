@@ -14,6 +14,7 @@ import affiliateRouter from "./affiliate";
 import workspacesRouter from "./workspaces";
 import postCommentsRouter from "./post-comments";
 import approvalRouter from "./approval";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(schedulesRouter);
 router.use(usageRouter);
 router.use(adminRouter);
 router.use(affiliateRouter);
+router.use(analyticsRouter);
 
 export default router;

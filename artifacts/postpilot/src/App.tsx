@@ -18,6 +18,7 @@ import ApprovalPage from "@/pages/approval";
 import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
+import AnalyticsPage from "@/pages/analytics";
 import CalendarPage from "@/pages/calendar";
 import LibraryPage from "@/pages/library";
 import AffiliatePage from "@/pages/affiliate";
@@ -268,6 +269,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />
+          <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} />} />
           <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
           <Route path="/team" component={() => <ProtectedRoute component={TeamPage} />} />
           <Route path="/invite/:token" component={InvitePage} />

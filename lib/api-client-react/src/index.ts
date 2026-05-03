@@ -5,5 +5,6 @@ export {
   setAuthTokenGetter,
   setImpersonationGetter,
   setExtraHeadersProvider,
+  customFetch,
 } from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";

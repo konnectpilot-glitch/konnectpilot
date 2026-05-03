@@ -39,6 +39,17 @@ lib/api-client-react/      → Generated React Query hooks
 - Workspace switcher lives in the layout header; the React `WorkspaceProvider` registers an `extraHeadersProvider` on the api-client-react custom fetch that injects `X-Workspace-Id` on every generated query/mutation.
 - Threaded comments panel on the Posts page (`/posts`) lets any workspace member comment; deletes are restricted to the comment author or admins.
 
+### Analytics & Performance Memory
+- New tables in `lib/db/src/schema/analytics.ts`: `post_metrics_snapshots` (per-post time-series), `brand_daily_aggregates` (daily KPI rollups), `follower_history`, `brand_performance_memory` (distilled strategy sibling to brand_memory_profiles), `ai_insights` (recommendations queue), `analytics_reports` (weekly/monthly), `metric_fetch_cursors` (decaying scheduler state).
+- Background `analytics-scheduler.ts` polls FB/IG/LinkedIn metrics on decaying cadence (1h → 6h → 24h, capped 30d), computes per-post engagement scores, refreshes daily aggregates + follower history, prunes raw snapshots >90d.
+- `performance-memory.ts` distills top exemplars, best hours, best content types, winning hashtags/hook templates, and a 1-paragraph strategy via `gpt-4.1-mini` every 5 new samples.
+- `buildPerformanceMemoryContext()` is concatenated alongside `buildBrandMemoryContext()` in both `routes/generate.ts` and `routes/approval.ts`. The two memories are stored separately and never merged at write time.
+- `routes/analytics.ts` exposes summary, timeseries, top-posts, compare, recommendations, insights (refresh/dismiss/apply), performance-memory, weekly/monthly reports, and SEO suggestions. All gated by `requireAuth` + `requireWorkspace`.
+- Analytics endpoints are defined contract-first in `lib/api-spec/openapi.yaml` and consumed via Orval-generated React Query hooks (`useGetAnalyticsSummary`, `useApplyAiInsight`, `useCompareAnalyticsPosts`, etc.).
+- `lib/oauth-refresh.ts` centralizes Facebook/Instagram (`fb_exchange_token`) and LinkedIn (`refresh_token`) token refresh. Scheduler calls `ensureFreshAccessToken` proactively and `forceRefreshAccessToken` on `HttpAuthError` (401/403).
+- LinkedIn collectors send `Authorization: Bearer <token>` plus `LinkedIn-Version` and `X-Restli-Protocol-Version` headers (analytics-collectors.ts).
+- Frontend `/analytics` page (sidebar nav with `LineChart` icon) renders KPIs, recharts trends, follower chart, top posts (with checkbox-driven side-by-side **Compare drawer**), best-time heatmap, **content-type performance breakdown** (horizontal bar), AI insights with **Apply** + dismiss buttons, Performance Memory display, and weekly/monthly report download.
+
 ## API Routes
 
 ### Auth (all protected via Clerk JWT)

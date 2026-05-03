@@ -17,6 +17,7 @@ import {
   UpdateMeBody,
   UpdateMeResponse,
 } from "@workspace/api-zod";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 

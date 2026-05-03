@@ -5,6 +5,196 @@
  * PostPilot API specification
  * OpenAPI spec version: 0.1.0
  */
+export type AnalyticsSummaryPrev = {
+  impressions: number;
+  reach: number;
+  likes: number;
+  engagementRate: number;
+  ctr: number;
+};
+
+export type AnalyticsSummaryFollowers = {
+  latest: number;
+  min: number;
+  max: number;
+  delta: number;
+};
+
+export interface AnalyticsSummary {
+  brandId: number;
+  range: number;
+  /** @nullable */
+  platform?: string | null;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  clicks: number;
+  engagementRate: number;
+  /** Click-through rate = clicks / impressions */
+  ctr: number;
+  prev: AnalyticsSummaryPrev;
+  followers: AnalyticsSummaryFollowers;
+}
+
+export interface SeoRecommendationsRequest {
+  topic?: string;
+  draft?: string;
+}
+
+export interface SeoRecommendationsResponse {
+  created: number;
+}
+
+export type AnalyticsTimeseriesPointsItem = {
+  day: string;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  engagementRate: number;
+};
+
+export type AnalyticsTimeseriesFollowersItem = {
+  day: string;
+  followers: number;
+};
+
+export interface AnalyticsTimeseries {
+  range: number;
+  /** @nullable */
+  platform?: string | null;
+  points: AnalyticsTimeseriesPointsItem[];
+  followers: AnalyticsTimeseriesFollowersItem[];
+}
+
+export interface TopPost {
+  postId: number;
+  platform: string;
+  content: string;
+  /** @nullable */
+  imageUrl?: string | null;
+  /** @nullable */
+  publishedAt?: string | null;
+  score: number;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  engagementRate: number;
+}
+
+export type PostComparisonAPost = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type PostComparisonAMetrics = { [key: string]: unknown } | null;
+
+export type PostComparisonA = {
+  post: PostComparisonAPost;
+  /** @nullable */
+  metrics?: PostComparisonAMetrics;
+};
+
+export type PostComparisonBPost = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type PostComparisonBMetrics = { [key: string]: unknown } | null;
+
+export type PostComparisonB = {
+  post: PostComparisonBPost;
+  /** @nullable */
+  metrics?: PostComparisonBMetrics;
+};
+
+export interface PostComparison {
+  a: PostComparisonA;
+  b: PostComparisonB;
+}
+
+export type AnalyticsRecommendationsBestHoursByPlatform = {
+  [key: string]: number[];
+};
+
+export type AnalyticsRecommendationsBestContentTypesByPlatform = {
+  [key: string]: string[];
+};
+
+export interface AnalyticsRecommendations {
+  bestHoursByPlatform: AnalyticsRecommendationsBestHoursByPlatform;
+  bestContentTypesByPlatform: AnalyticsRecommendationsBestContentTypesByPlatform;
+  winningHashtags: string[];
+  winningHookTemplates: string[];
+}
+
+/**
+ * @nullable
+ */
+export type AiInsightPayload = { [key: string]: unknown } | null;
+
+export interface AiInsight {
+  id: number;
+  brandId: number;
+  /** @nullable */
+  postId?: number | null;
+  kind: string;
+  severity: string;
+  title: string;
+  body: string;
+  /** @nullable */
+  payload?: AiInsightPayload;
+  createdAt: string;
+  /** @nullable */
+  appliedAt?: string | null;
+}
+
+export type PerformanceMemoryTopExemplarsItem = {
+  postId: number;
+  platform: string;
+  content: string;
+  score: number;
+};
+
+export type PerformanceMemoryBestHoursByPlatform = { [key: string]: number[] };
+
+export type PerformanceMemoryBestContentTypesByPlatform = {
+  [key: string]: string[];
+};
+
+export interface PerformanceMemory {
+  brandId: number;
+  topExemplars: PerformanceMemoryTopExemplarsItem[];
+  bestHoursByPlatform: PerformanceMemoryBestHoursByPlatform;
+  bestContentTypesByPlatform: PerformanceMemoryBestContentTypesByPlatform;
+  winningHashtags: string[];
+  winningHookTemplates: string[];
+  /** @nullable */
+  distilledStrategy?: string | null;
+  samplesAnalyzed: number;
+  /** @nullable */
+  lastDistilledAt?: string | null;
+  updatedAt: string;
+}
+
+export type AnalyticsReportSummary = { [key: string]: unknown };
+
+export interface AnalyticsReport {
+  id: number;
+  brandId: number;
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  summary: AnalyticsReportSummary;
+  html?: string;
+  createdAt: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -544,4 +734,79 @@ export type AdminPayAffiliate200 = {
   ok: boolean;
   paidCents: number;
   commissionCount: number;
+};
+
+export type GetAnalyticsSummaryParams = {
+  range?: GetAnalyticsSummaryRange;
+  platform?: string;
+};
+
+export type GetAnalyticsSummaryRange =
+  (typeof GetAnalyticsSummaryRange)[keyof typeof GetAnalyticsSummaryRange];
+
+export const GetAnalyticsSummaryRange = {
+  "7d": "7d",
+  "30d": "30d",
+  "90d": "90d",
+} as const;
+
+export type GetAnalyticsTimeseriesParams = {
+  range?: GetAnalyticsTimeseriesRange;
+  platform?: string;
+};
+
+export type GetAnalyticsTimeseriesRange =
+  (typeof GetAnalyticsTimeseriesRange)[keyof typeof GetAnalyticsTimeseriesRange];
+
+export const GetAnalyticsTimeseriesRange = {
+  "7d": "7d",
+  "30d": "30d",
+  "90d": "90d",
+} as const;
+
+export type GetAnalyticsTopPostsParams = {
+  range?: string;
+  platform?: string;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
+
+export type CompareAnalyticsPostsParams = {
+  a: number;
+  b: number;
+};
+
+export type RefreshAiInsights200 = {
+  created: number;
+};
+
+export type DismissAiInsight200 = {
+  ok: boolean;
+};
+
+/**
+ * @nullable
+ */
+export type ApplyAiInsight200Payload = { [key: string]: unknown } | null;
+
+export type ApplyAiInsight200 = {
+  ok: boolean;
+  /** @nullable */
+  payload?: ApplyAiInsight200Payload;
+};
+
+export type GenerateAnalyticsReportBodyPeriod =
+  (typeof GenerateAnalyticsReportBodyPeriod)[keyof typeof GenerateAnalyticsReportBodyPeriod];
+
+export const GenerateAnalyticsReportBodyPeriod = {
+  weekly: "weekly",
+  monthly: "monthly",
+} as const;
+
+export type GenerateAnalyticsReportBody = {
+  period: GenerateAnalyticsReportBodyPeriod;
+  emailOptIn?: boolean;
 };

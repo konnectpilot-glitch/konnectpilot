@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
 import { buildBrandMemoryContext } from "../lib/brand-memory";
+import { buildPerformanceMemoryContext } from "../lib/performance-memory";
 
 const router: IRouter = Router();
 
@@ -68,14 +69,18 @@ router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): P
     return;
   }
 
+  const user = req.user;
   const reservation = await reserveQuota(user.id, user.plan, "caption");
   if (!reservation.allowed) {
     quotaExceededResponse(res, "caption", reservation.used, reservation.limit, user.plan);
     return;
   }
 
-  const brandMemory = await buildBrandMemoryContext(brand.id);
-  const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic, brandMemory);
+  const [brandMemory, perfMemory] = await Promise.all([
+    buildBrandMemoryContext(brand.id),
+    buildPerformanceMemoryContext(brand.id),
+  ]);
+  const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic, brandMemory + perfMemory);
 
   try {
     const completion = await openai.chat.completions.create({
@@ -107,6 +112,7 @@ router.post("/generate/image", requireAuth, requireWorkspace, async (req: any, r
     return;
   }
 
+  const user = req.user;
   const imageReservation = await reserveQuota(user.id, user.plan, "image");
   if (!imageReservation.allowed) {
     quotaExceededResponse(res, "image", imageReservation.used, imageReservation.limit, user.plan);

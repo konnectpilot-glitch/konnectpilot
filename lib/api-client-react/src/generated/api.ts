@@ -23,6 +23,12 @@ import type {
   AdminSetSuperadminBody,
   AdminUserSummary,
   AffiliateProfile,
+  AiInsight,
+  AnalyticsRecommendations,
+  AnalyticsReport,
+  AnalyticsSummary,
+  AnalyticsTimeseries,
+  ApplyAiInsight200,
   AttributeAffiliateSignup200,
   AttributeSignupBody,
   Brand,
@@ -30,23 +36,35 @@ import type {
   BulkApprovalBody,
   BulkApprovalResult,
   CheckoutSession,
+  CompareAnalyticsPostsParams,
   CreateBrandBody,
   CreateCheckoutBody,
   DashboardStats,
+  DismissAiInsight200,
   EditApprovalPostBody,
   ErrorResponse,
+  GenerateAnalyticsReportBody,
   GenerateBatchBody,
   GenerateBatchResult,
   GeneratePostBody,
   GeneratedPost,
+  GetAnalyticsSummaryParams,
+  GetAnalyticsTimeseriesParams,
+  GetAnalyticsTopPostsParams,
   HealthStatus,
   ImpersonationSession,
   ListPostsParams,
+  PerformanceMemory,
   Plan,
   PlatformStat,
   PortalSession,
   Post,
+  PostComparison,
+  RefreshAiInsights200,
   SavePostBody,
+  SeoRecommendationsRequest,
+  SeoRecommendationsResponse,
+  TopPost,
   TrackAffiliateClick200,
   TrackClickBody,
   UpdateAffiliatePayout200,
@@ -2936,3 +2954,1235 @@ export function useGetBrandsIdMemory<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Brand-level KPI summary with previous-period comparison
+ */
+export const getGetAnalyticsSummaryUrl = (
+  id: number,
+  params?: GetAnalyticsSummaryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/brands/${id}/summary?${stringifiedParams}`
+    : `/api/analytics/brands/${id}/summary`;
+};
+
+export const getAnalyticsSummary = async (
+  id: number,
+  params?: GetAnalyticsSummaryParams,
+  options?: RequestInit,
+): Promise<AnalyticsSummary> => {
+  return customFetch<AnalyticsSummary>(getGetAnalyticsSummaryUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAnalyticsSummaryQueryKey = (
+  id: number,
+  params?: GetAnalyticsSummaryParams,
+) => {
+  return [
+    `/api/analytics/brands/${id}/summary`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAnalyticsSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalyticsSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAnalyticsSummaryQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnalyticsSummary>>
+  > = ({ signal }) =>
+    getAnalyticsSummary(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalyticsSummary>>
+>;
+export type GetAnalyticsSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Brand-level KPI summary with previous-period comparison
+ */
+
+export function useGetAnalyticsSummary<
+  TData = Awaited<ReturnType<typeof getAnalyticsSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsSummaryQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Daily engagement and follower time series
+ */
+export const getGetAnalyticsTimeseriesUrl = (
+  id: number,
+  params?: GetAnalyticsTimeseriesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/brands/${id}/timeseries?${stringifiedParams}`
+    : `/api/analytics/brands/${id}/timeseries`;
+};
+
+export const getAnalyticsTimeseries = async (
+  id: number,
+  params?: GetAnalyticsTimeseriesParams,
+  options?: RequestInit,
+): Promise<AnalyticsTimeseries> => {
+  return customFetch<AnalyticsTimeseries>(
+    getGetAnalyticsTimeseriesUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAnalyticsTimeseriesQueryKey = (
+  id: number,
+  params?: GetAnalyticsTimeseriesParams,
+) => {
+  return [
+    `/api/analytics/brands/${id}/timeseries`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAnalyticsTimeseriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalyticsTimeseries>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsTimeseriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsTimeseries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAnalyticsTimeseriesQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnalyticsTimeseries>>
+  > = ({ signal }) =>
+    getAnalyticsTimeseries(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsTimeseries>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsTimeseriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalyticsTimeseries>>
+>;
+export type GetAnalyticsTimeseriesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Daily engagement and follower time series
+ */
+
+export function useGetAnalyticsTimeseries<
+  TData = Awaited<ReturnType<typeof getAnalyticsTimeseries>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsTimeseriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsTimeseries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsTimeseriesQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Best-performing posts ranked by engagement score
+ */
+export const getGetAnalyticsTopPostsUrl = (
+  id: number,
+  params?: GetAnalyticsTopPostsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/brands/${id}/top-posts?${stringifiedParams}`
+    : `/api/analytics/brands/${id}/top-posts`;
+};
+
+export const getAnalyticsTopPosts = async (
+  id: number,
+  params?: GetAnalyticsTopPostsParams,
+  options?: RequestInit,
+): Promise<TopPost[]> => {
+  return customFetch<TopPost[]>(getGetAnalyticsTopPostsUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAnalyticsTopPostsQueryKey = (
+  id: number,
+  params?: GetAnalyticsTopPostsParams,
+) => {
+  return [
+    `/api/analytics/brands/${id}/top-posts`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAnalyticsTopPostsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalyticsTopPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsTopPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsTopPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAnalyticsTopPostsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnalyticsTopPosts>>
+  > = ({ signal }) =>
+    getAnalyticsTopPosts(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsTopPosts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsTopPostsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalyticsTopPosts>>
+>;
+export type GetAnalyticsTopPostsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Best-performing posts ranked by engagement score
+ */
+
+export function useGetAnalyticsTopPosts<
+  TData = Awaited<ReturnType<typeof getAnalyticsTopPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetAnalyticsTopPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsTopPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsTopPostsQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Side-by-side metrics for two posts
+ */
+export const getCompareAnalyticsPostsUrl = (
+  params: CompareAnalyticsPostsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/posts/compare?${stringifiedParams}`
+    : `/api/analytics/posts/compare`;
+};
+
+export const compareAnalyticsPosts = async (
+  params: CompareAnalyticsPostsParams,
+  options?: RequestInit,
+): Promise<PostComparison> => {
+  return customFetch<PostComparison>(getCompareAnalyticsPostsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getCompareAnalyticsPostsQueryKey = (
+  params?: CompareAnalyticsPostsParams,
+) => {
+  return [`/api/analytics/posts/compare`, ...(params ? [params] : [])] as const;
+};
+
+export const getCompareAnalyticsPostsQueryOptions = <
+  TData = Awaited<ReturnType<typeof compareAnalyticsPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  params: CompareAnalyticsPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareAnalyticsPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getCompareAnalyticsPostsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof compareAnalyticsPosts>>
+  > = ({ signal }) =>
+    compareAnalyticsPosts(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof compareAnalyticsPosts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type CompareAnalyticsPostsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof compareAnalyticsPosts>>
+>;
+export type CompareAnalyticsPostsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Side-by-side metrics for two posts
+ */
+
+export function useCompareAnalyticsPosts<
+  TData = Awaited<ReturnType<typeof compareAnalyticsPosts>>,
+  TError = ErrorType<unknown>,
+>(
+  params: CompareAnalyticsPostsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareAnalyticsPosts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getCompareAnalyticsPostsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Best posting hours, content types, hashtags, hooks
+ */
+export const getGetAnalyticsRecommendationsUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/recommendations`;
+};
+
+export const getAnalyticsRecommendations = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AnalyticsRecommendations> => {
+  return customFetch<AnalyticsRecommendations>(
+    getGetAnalyticsRecommendationsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAnalyticsRecommendationsQueryKey = (id: number) => {
+  return [`/api/analytics/brands/${id}/recommendations`] as const;
+};
+
+export const getGetAnalyticsRecommendationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalyticsRecommendations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsRecommendations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAnalyticsRecommendationsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnalyticsRecommendations>>
+  > = ({ signal }) =>
+    getAnalyticsRecommendations(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsRecommendations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsRecommendationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalyticsRecommendations>>
+>;
+export type GetAnalyticsRecommendationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Best posting hours, content types, hashtags, hooks
+ */
+
+export function useGetAnalyticsRecommendations<
+  TData = Awaited<ReturnType<typeof getAnalyticsRecommendations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnalyticsRecommendations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsRecommendationsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List active AI insights for a brand
+ */
+export const getListAiInsightsUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/insights`;
+};
+
+export const listAiInsights = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AiInsight[]> => {
+  return customFetch<AiInsight[]>(getListAiInsightsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAiInsightsQueryKey = (id: number) => {
+  return [`/api/analytics/brands/${id}/insights`] as const;
+};
+
+export const getListAiInsightsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAiInsights>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAiInsights>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAiInsightsQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAiInsights>>> = ({
+    signal,
+  }) => listAiInsights(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAiInsights>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAiInsightsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAiInsights>>
+>;
+export type ListAiInsightsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List active AI insights for a brand
+ */
+
+export function useListAiInsights<
+  TData = Awaited<ReturnType<typeof listAiInsights>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAiInsights>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAiInsightsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Recompute Performance Memory and generate new AI insights
+ */
+export const getRefreshAiInsightsUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/insights/refresh`;
+};
+
+export const refreshAiInsights = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RefreshAiInsights200> => {
+  return customFetch<RefreshAiInsights200>(getRefreshAiInsightsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRefreshAiInsightsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshAiInsights>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshAiInsights>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["refreshAiInsights"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshAiInsights>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return refreshAiInsights(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshAiInsightsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshAiInsights>>
+>;
+
+export type RefreshAiInsightsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Recompute Performance Memory and generate new AI insights
+ */
+export const useRefreshAiInsights = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshAiInsights>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshAiInsights>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRefreshAiInsightsMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss an AI insight
+ */
+export const getDismissAiInsightUrl = (id: number) => {
+  return `/api/analytics/insights/${id}/dismiss`;
+};
+
+export const dismissAiInsight = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DismissAiInsight200> => {
+  return customFetch<DismissAiInsight200>(getDismissAiInsightUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDismissAiInsightMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["dismissAiInsight"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissAiInsight>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return dismissAiInsight(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissAiInsightMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissAiInsight>>
+>;
+
+export type DismissAiInsightMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Dismiss an AI insight
+ */
+export const useDismissAiInsight = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDismissAiInsightMutationOptions(options));
+};
+
+/**
+ * @summary Mark an AI insight as applied and return its action payload
+ */
+export const getApplyAiInsightUrl = (id: number) => {
+  return `/api/analytics/insights/${id}/apply`;
+};
+
+export const applyAiInsight = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApplyAiInsight200> => {
+  return customFetch<ApplyAiInsight200>(getApplyAiInsightUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getApplyAiInsightMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applyAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof applyAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["applyAiInsight"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof applyAiInsight>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return applyAiInsight(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApplyAiInsightMutationResult = NonNullable<
+  Awaited<ReturnType<typeof applyAiInsight>>
+>;
+
+export type ApplyAiInsightMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark an AI insight as applied and return its action payload
+ */
+export const useApplyAiInsight = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applyAiInsight>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof applyAiInsight>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getApplyAiInsightMutationOptions(options));
+};
+
+/**
+ * @summary Distilled Performance Memory for a brand
+ */
+export const getGetPerformanceMemoryUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/performance-memory`;
+};
+
+export const getPerformanceMemory = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PerformanceMemory> => {
+  return customFetch<PerformanceMemory>(getGetPerformanceMemoryUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPerformanceMemoryQueryKey = (id: number) => {
+  return [`/api/analytics/brands/${id}/performance-memory`] as const;
+};
+
+export const getGetPerformanceMemoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPerformanceMemory>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPerformanceMemory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPerformanceMemoryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPerformanceMemory>>
+  > = ({ signal }) => getPerformanceMemory(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPerformanceMemory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPerformanceMemoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPerformanceMemory>>
+>;
+export type GetPerformanceMemoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Distilled Performance Memory for a brand
+ */
+
+export function useGetPerformanceMemory<
+  TData = Awaited<ReturnType<typeof getPerformanceMemory>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPerformanceMemory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPerformanceMemoryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List analytics reports for a brand
+ */
+export const getListAnalyticsReportsUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/reports`;
+};
+
+export const listAnalyticsReports = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AnalyticsReport[]> => {
+  return customFetch<AnalyticsReport[]>(getListAnalyticsReportsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAnalyticsReportsQueryKey = (id: number) => {
+  return [`/api/analytics/brands/${id}/reports`] as const;
+};
+
+export const getListAnalyticsReportsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAnalyticsReports>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAnalyticsReports>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAnalyticsReportsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAnalyticsReports>>
+  > = ({ signal }) => listAnalyticsReports(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAnalyticsReports>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAnalyticsReportsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAnalyticsReports>>
+>;
+export type ListAnalyticsReportsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List analytics reports for a brand
+ */
+
+export function useListAnalyticsReports<
+  TData = Awaited<ReturnType<typeof listAnalyticsReports>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAnalyticsReports>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAnalyticsReportsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Generate a weekly or monthly performance report
+ */
+export const getGenerateAnalyticsReportUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/reports`;
+};
+
+export const generateAnalyticsReport = async (
+  id: number,
+  generateAnalyticsReportBody: GenerateAnalyticsReportBody,
+  options?: RequestInit,
+): Promise<AnalyticsReport> => {
+  return customFetch<AnalyticsReport>(getGenerateAnalyticsReportUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateAnalyticsReportBody),
+  });
+};
+
+export const getGenerateAnalyticsReportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAnalyticsReport>>,
+    TError,
+    { id: number; data: BodyType<GenerateAnalyticsReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateAnalyticsReport>>,
+  TError,
+  { id: number; data: BodyType<GenerateAnalyticsReportBody> },
+  TContext
+> => {
+  const mutationKey = ["generateAnalyticsReport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateAnalyticsReport>>,
+    { id: number; data: BodyType<GenerateAnalyticsReportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return generateAnalyticsReport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateAnalyticsReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateAnalyticsReport>>
+>;
+export type GenerateAnalyticsReportMutationBody =
+  BodyType<GenerateAnalyticsReportBody>;
+export type GenerateAnalyticsReportMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate a weekly or monthly performance report
+ */
+export const useGenerateAnalyticsReport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAnalyticsReport>>,
+    TError,
+    { id: number; data: BodyType<GenerateAnalyticsReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateAnalyticsReport>>,
+  TError,
+  { id: number; data: BodyType<GenerateAnalyticsReportBody> },
+  TContext
+> => {
+  return useMutation(getGenerateAnalyticsReportMutationOptions(options));
+};
+
+/**
+ * @summary Generate SEO recommendations for a blog draft, persisted as ai_insights
+ */
+export const getGenerateAnalyticsSeoUrl = (id: number) => {
+  return `/api/analytics/brands/${id}/seo`;
+};
+
+export const generateAnalyticsSeo = async (
+  id: number,
+  seoRecommendationsRequest: SeoRecommendationsRequest,
+  options?: RequestInit,
+): Promise<SeoRecommendationsResponse> => {
+  return customFetch<SeoRecommendationsResponse>(
+    getGenerateAnalyticsSeoUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(seoRecommendationsRequest),
+    },
+  );
+};
+
+export const getGenerateAnalyticsSeoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAnalyticsSeo>>,
+    TError,
+    { id: number; data: BodyType<SeoRecommendationsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateAnalyticsSeo>>,
+  TError,
+  { id: number; data: BodyType<SeoRecommendationsRequest> },
+  TContext
+> => {
+  const mutationKey = ["generateAnalyticsSeo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateAnalyticsSeo>>,
+    { id: number; data: BodyType<SeoRecommendationsRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return generateAnalyticsSeo(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateAnalyticsSeoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateAnalyticsSeo>>
+>;
+export type GenerateAnalyticsSeoMutationBody =
+  BodyType<SeoRecommendationsRequest>;
+export type GenerateAnalyticsSeoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate SEO recommendations for a blog draft, persisted as ai_insights
+ */
+export const useGenerateAnalyticsSeo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAnalyticsSeo>>,
+    TError,
+    { id: number; data: BodyType<SeoRecommendationsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateAnalyticsSeo>>,
+  TError,
+  { id: number; data: BodyType<SeoRecommendationsRequest> },
+  TContext
+> => {
+  return useMutation(getGenerateAnalyticsSeoMutationOptions(options));
+};

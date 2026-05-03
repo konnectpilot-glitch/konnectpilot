@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
-import { CalendarDays, Library, DollarSign } from "lucide-react";
+import { CalendarDays, Library, DollarSign, LineChart } from "lucide-react";
 import { useGetMe, useGetMyUsage } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
   { href: "/library", label: "Library", icon: Library },
   { href: "/approval", label: "Approval Queue", icon: ClipboardCheck },
   { href: "/posts", label: "Post History", icon: FileText },
+  { href: "/analytics", label: "Analytics", icon: LineChart },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
   { href: "/affiliate", label: "Affiliate", icon: DollarSign },
   { href: "/team", label: "Team", icon: Users },
