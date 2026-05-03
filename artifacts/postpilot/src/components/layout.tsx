@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  Zap,
   Share2,
   Shield,
   ClipboardCheck,
@@ -24,6 +23,7 @@ import { useGetMe, useGetMyUsage } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
 import WorkspaceSwitcher from "./workspace-switcher";
+import { KpLogo } from "@/components/kp-logo";
 
 type NavItem = { href: string; label: string; icon: any };
 
@@ -73,11 +73,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="px-4 py-5 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-lg text-foreground">KonnectPilot</span>
+        <Link href="/dashboard">
+          <KpLogo size="md" />
         </Link>
       </div>
 
@@ -151,12 +148,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-bold text-foreground">KonnectPilot</span>
-          </div>
+          <KpLogo size="sm" />
           <div className="flex items-center gap-1">
             <WorkspaceSwitcher />
             <NotificationsBell />

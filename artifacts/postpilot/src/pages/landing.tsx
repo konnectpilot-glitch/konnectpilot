@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import {
-  Zap,
   Check,
   ArrowRight,
   Facebook,
@@ -19,6 +18,7 @@ import {
   Star,
 } from "lucide-react";
 import MarketingShell from "@/components/marketing-shell";
+import { KpMark } from "@/components/kp-logo";
 import ProductMockup from "@/components/marketing/product-mockup";
 import { PLANS, priceFor } from "@/lib/plans";
 
@@ -336,7 +336,7 @@ export default function LandingPage() {
                   <th className="text-left p-4 font-semibold text-foreground">Capability</th>
                   <th className="p-4 font-semibold">
                     <span className="inline-flex items-center gap-1.5 text-primary">
-                      <Zap className="w-4 h-4" /> KonnectPilot
+                      <KpMark className="w-4 h-4" color="currentColor" /> KonnectPilot
                     </span>
                   </th>
                   <th className="p-4 font-semibold text-foreground">Buffer-style tools</th>

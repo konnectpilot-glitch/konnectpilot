@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
-import { Zap, ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import { KpLogo } from "@/components/kp-logo";
 
 const NAV = [
   { href: "/features", label: "Features" },
@@ -24,11 +25,8 @@ export default function MarketingShell({ children }: { children: React.ReactNode
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-lg text-foreground">KonnectPilot</span>
+          <Link href="/" className="group">
+            <KpLogo size="md" />
           </Link>
           <nav className="hidden md:flex items-center gap-7">
             {NAV.map((n) => (
@@ -105,11 +103,8 @@ export default function MarketingShell({ children }: { children: React.ReactNode
       <footer className="border-t border-border py-10 mt-16 bg-secondary/20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold text-foreground">KonnectPilot</span>
+            <div className="mb-3">
+              <KpLogo size="sm" />
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
               Pilot your content. Grow on autopilot. Built by ClicknKonnect for solo creators, small businesses, and the agencies who serve them.
