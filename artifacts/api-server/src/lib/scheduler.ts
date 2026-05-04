@@ -17,6 +17,63 @@ const STRICT_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 let timer: NodeJS.Timeout | null = null;
 
+/**
+ * Returns the offset (ms) between the given UTC instant and the same wall-clock
+ * moment in `tz`. Positive when `tz` is ahead of UTC. DST-correct.
+ */
+function tzOffsetMs(date: Date, tz: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    dtf.formatToParts(date)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value]),
+  );
+  const asUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return asUTC - date.getTime();
+}
+
+/**
+ * Compute the UTC instant corresponding to today's HH:MM wall-clock in `tz`.
+ * Falls back to UTC if the timezone is invalid.
+ */
+function utcSlotForLocalTime(now: Date, hh: number, mm: number, tz: string): Date {
+  try {
+    // Discover what calendar date "now" maps to in tz.
+    const dateFmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const [Y, M, D] = dateFmt.format(now).split("-").map(Number);
+    // Treat the wall-clock time as if it were UTC, then subtract the tz offset
+    // at that moment to land on the true UTC instant.
+    const naive = new Date(Date.UTC(Y, M - 1, D, hh, mm, 0));
+    const offset = tzOffsetMs(naive, tz);
+    return new Date(naive.getTime() - offset);
+  } catch {
+    const fallback = new Date(now);
+    fallback.setUTCHours(hh, mm, 0, 0);
+    return fallback;
+  }
+}
+
 function buildCaption(brand: any, platform: string, prompt?: string | null): string {
   const platformInstructions: Record<string, string> = {
     instagram: "Write an engaging Instagram caption with 3-5 relevant hashtags. Max 200 words.",
@@ -351,8 +408,7 @@ async function tick() {
         if (!STRICT_TIME_REGEX.test(time)) continue;
         const [hh, mm] = time.split(":").map(Number);
 
-        const slotTime = new Date(now);
-        slotTime.setUTCHours(hh, mm, 0, 0);
+        const slotTime = utcSlotForLocalTime(now, hh, mm, schedule.timezone || "UTC");
         const diffMs = now.getTime() - slotTime.getTime();
         if (diffMs < 0 || diffMs > SLOT_TOLERANCE_MS) continue;
 

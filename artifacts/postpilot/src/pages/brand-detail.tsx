@@ -119,12 +119,72 @@ function ScheduleForm({
   onCancel: () => void;
   submitting: boolean;
 }) {
+  const browserTz = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      return "UTC";
+    }
+  }, []);
   const [name, setName] = useState(initial?.name ?? "");
   const [platforms, setPlatforms] = useState<string[]>(initial?.platforms ?? ["facebook"]);
   const [postsPerDay, setPostsPerDay] = useState(initial?.postTimes?.length ?? 1);
   const [postTimes, setPostTimes] = useState<string[]>(initial?.postTimes ?? ["09:00"]);
+  const [timezone, setTimezone] = useState<string>(initial?.timezone ?? browserTz);
   const [contentPrompt, setContentPrompt] = useState(initial?.contentPrompt ?? "");
   const [imageStyle, setImageStyle] = useState(initial?.imageStyle ?? "");
+
+  const timezoneOptions = useMemo(() => {
+    const base = [
+      "UTC",
+      "America/Los_Angeles",
+      "America/Denver",
+      "America/Chicago",
+      "America/New_York",
+      "America/Toronto",
+      "America/Mexico_City",
+      "America/Sao_Paulo",
+      "Europe/London",
+      "Europe/Dublin",
+      "Europe/Paris",
+      "Europe/Berlin",
+      "Europe/Madrid",
+      "Europe/Rome",
+      "Europe/Amsterdam",
+      "Europe/Stockholm",
+      "Europe/Athens",
+      "Europe/Istanbul",
+      "Europe/Moscow",
+      "Africa/Cairo",
+      "Africa/Johannesburg",
+      "Asia/Dubai",
+      "Asia/Karachi",
+      "Asia/Kolkata",
+      "Asia/Bangkok",
+      "Asia/Singapore",
+      "Asia/Hong_Kong",
+      "Asia/Shanghai",
+      "Asia/Tokyo",
+      "Asia/Seoul",
+      "Australia/Perth",
+      "Australia/Sydney",
+      "Pacific/Auckland",
+    ];
+    const set = new Set<string>([browserTz, ...base, timezone]);
+    return Array.from(set);
+  }, [browserTz, timezone]);
+
+  function tzAbbr(tz: string): string {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        timeZoneName: "short",
+      }).formatToParts(new Date());
+      return parts.find((p) => p.type === "timeZoneName")?.value ?? tz;
+    } catch {
+      return tz;
+    }
+  }
 
   const togglePlatform = (id: string) => {
     setPlatforms((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
@@ -164,7 +224,7 @@ function ScheduleForm({
       brandId,
       platforms,
       postTimes,
-      timezone: "UTC",
+      timezone,
       contentPrompt: contentPrompt.trim() || null,
       imageStyle: imageStyle.trim() || null,
     });
@@ -230,7 +290,24 @@ function ScheduleForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Post times (UTC, 24-hour)</label>
+        <label className="block text-sm font-medium mb-1.5">Time zone</label>
+        <select
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+        >
+          {timezoneOptions.map((tz) => (
+            <option key={tz} value={tz}>
+              {tz === browserTz ? `${tz} (your local) — ${tzAbbr(tz)}` : `${tz} — ${tzAbbr(tz)}`}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Post times <span className="text-xs text-muted-foreground font-normal">({tzAbbr(timezone)}, 24-hour)</span>
+        </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {postTimes.map((t, i) => (
             <input
@@ -242,7 +319,9 @@ function ScheduleForm({
             />
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Times are in UTC. Add your local offset to convert.</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Posts publish at these times in <span className="font-medium text-foreground">{timezone}</span>.
+        </p>
       </div>
 
       <div>
