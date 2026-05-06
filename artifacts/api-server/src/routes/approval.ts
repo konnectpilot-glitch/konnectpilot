@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, brandsTable, postsTable, brandMemoryProfilesTable } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { generateClaudeText, generateNanoBananaImage } from "../lib/ai-providers";
 import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import {
   PostApprovalGenerateBatchBody as GenerateBatchBody,
@@ -49,10 +49,15 @@ ${brandMemory}
 Write ONLY the post content. No preamble, no explanations.`;
 }
 
-function buildImageUrl(brand: any): string {
+async function buildImageDataUrl(brand: any): Promise<string | null> {
   const prompt = `Professional social media image for ${brand.name}, a ${brand.industry} brand. ${brand.tone} tone for ${brand.targetAudience}. Polished, scroll-stopping, no text overlays.`;
-  const seed = Math.floor(Math.random() * 999_999);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
+  try {
+    const { dataUrl } = await generateNanoBananaImage(prompt, { timeoutMs: 120_000 });
+    return dataUrl;
+  } catch (err: any) {
+    logger.warn({ err: err?.message, brandId: brand.id }, "Approval batch image gen failed");
+    return null;
+  }
 }
 
 function nextSlotTime(base: Date, postTime: string, dayOffset: number): Date {
@@ -117,13 +122,12 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
       }
       let content = "";
       try {
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4.1",
-          max_completion_tokens: 1024,
-          messages: [{ role: "user", content: buildCaptionPrompt(brand, platform, null, brandMemory) }],
-        });
-        content = completion.choices[0]?.message?.content ?? "";
-        await setReservationTokens(reservation.reservationId, completion.usage?.total_tokens);
+        const { content: text, usage } = await generateClaudeText(
+          buildCaptionPrompt(brand, platform, null, brandMemory),
+          { maxTokens: 1024 },
+        );
+        content = text;
+        await setReservationTokens(reservation.reservationId, usage.totalTokens);
       } catch (err: any) {
         await releaseReservation(reservation.reservationId, reservation.usedBonus);
         logger.warn({ err: err?.message, brandId, platform }, "Batch caption gen failed");
@@ -158,7 +162,7 @@ router.post("/approval/generate-batch", requireAuth, requireWorkspace, async (re
           workspaceId: req.workspaceId,
           platform,
           content,
-          imageUrl: buildImageUrl(brand),
+          imageUrl: await buildImageDataUrl(brand),
           status,
           scheduledFor: slotTime,
           submittedById: req.user.id,

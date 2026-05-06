@@ -59,6 +59,8 @@ externalPort = 3000
 
 [userenv.shared]
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_Y3Jpc3AtaG91bmQtODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+AWS_REGION = "eu-north-1"
+BEDROCK_CLAUDE_MODEL_ID = "arn:aws:bedrock:eu-north-1:336846061819:inference-profile/global.anthropic.claude-opus-4-7"
 
 [nix]
 channel = "stable-25_05"

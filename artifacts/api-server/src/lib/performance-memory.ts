@@ -7,7 +7,7 @@ import {
   postsTable,
   aiInsightsTable,
 } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { generateClaudeText } from "./ai-providers";
 import { logger } from "./logger";
 
 const TOP_EXEMPLARS = 8;
@@ -209,12 +209,8 @@ ${args.winningHookTemplates.map((h, i) => `${i + 1}. ${h}`).join("\n") || "(none
 Return ONLY the bullet-point playbook.`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_completion_tokens: 350,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return completion.choices[0]?.message?.content?.trim() ?? null;
+    const { content } = await generateClaudeText(prompt, { maxTokens: 400 });
+    return content.trim() || null;
   } catch (err: any) {
     logger.warn({ err: err?.message }, "distillStrategy failed");
     return null;
@@ -312,12 +308,8 @@ ${lp.content.slice(0, 800)}
 
 Return ONLY the rewritten caption (no preamble).`;
     try {
-      const c = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        max_completion_tokens: 400,
-        messages: [{ role: "user", content: prompt }],
-      });
-      const suggestion = c.choices[0]?.message?.content?.trim() ?? "";
+      const c = await generateClaudeText(prompt, { maxTokens: 500 });
+      const suggestion = c.content.trim();
       if (suggestion) {
         await db.insert(aiInsightsTable).values({
           brandId,
@@ -416,12 +408,8 @@ ${(args.draft ?? "(no draft yet)").slice(0, 1500)}
 
 Return ONLY a single JSON object, no preamble.`;
   try {
-    const c = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_completion_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = c.choices[0]?.message?.content?.trim() ?? "";
+    const c = await generateClaudeText(prompt, { maxTokens: 600 });
+    const text = c.content.trim();
     const cleaned = text.replace(/^```(?:json)?\s*|\s*```$/g, "");
     const payload = JSON.parse(cleaned);
     await db.insert(aiInsightsTable).values({

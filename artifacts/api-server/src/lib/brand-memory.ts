@@ -5,7 +5,7 @@ import {
   postFeedbackEventsTable,
   type FeedbackAction,
 } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { generateClaudeText } from "./ai-providers";
 import { logger } from "./logger";
 
 const MAX_SAMPLES = 10;
@@ -66,12 +66,8 @@ ${edits || "(none yet)"}
 Return ONLY the bullet-point style guide, no preamble.`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_completion_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return completion.choices[0]?.message?.content?.trim() ?? null;
+    const { content } = await generateClaudeText(prompt, { maxTokens: 300 });
+    return content.trim() || null;
   } catch (err: any) {
     logger.warn({ err: err?.message, brandId: profile.brandId }, "Distill brand guidelines failed");
     return null;
@@ -226,12 +222,8 @@ Respond with ONLY a single line of JSON, no markdown:
 {"ok": true} OR {"ok": false, "reason": "<short reason, max 120 chars>"}`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_completion_tokens: 150,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = completion.choices[0]?.message?.content?.trim() ?? "";
+    const { content } = await generateClaudeText(prompt, { maxTokens: 200 });
+    const text = content.trim();
     // Tolerate code fences
     const cleaned = text.replace(/^```(?:json)?\s*|\s*```$/g, "");
     const parsed = JSON.parse(cleaned);

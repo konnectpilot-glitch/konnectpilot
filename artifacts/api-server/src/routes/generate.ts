@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireWorkspace, hasRoleAtLeast } from "./users";
 import { logger } from "../lib/logger";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { generateClaudeText, generateNanoBananaImage } from "../lib/ai-providers";
 import { reserveQuota, releaseReservation, setReservationTokens } from "../lib/quotas";
 import { buildBrandMemoryContext } from "../lib/brand-memory";
 import { buildPerformanceMemoryContext } from "../lib/performance-memory";
@@ -89,14 +89,8 @@ router.post("/generate", requireAuth, requireWorkspace, async (req: any, res): P
   const prompt = buildPrompt(brand, parsed.data.platform, parsed.data.topic, brandMemory + perfMemory);
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      max_completion_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const content = completion.choices[0]?.message?.content ?? "";
-    await setReservationTokens(reservation.reservationId, completion.usage?.total_tokens);
+    const { content, usage } = await generateClaudeText(prompt, { maxTokens: 1024 });
+    await setReservationTokens(reservation.reservationId, usage.totalTokens);
 
     res.json(GeneratePostResponse.parse({
       content,
@@ -152,42 +146,16 @@ The image should feel polished, brand-appropriate, and scroll-stopping.
 No text overlays. Clean composition with strong visual hierarchy.`;
   }
 
-  // Use Pollinations.ai — free image generation, no API key required
-  const encodedPrompt = encodeURIComponent(imagePrompt);
-  const seed = Math.floor(Math.random() * 999999);
-  const sourceUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
-
-  // Fetch the image bytes server-side (Pollinations can take 30-90s to generate).
-  // We download and inline the image as a data URL so the browser does not have to
-  // wait through a second slow round-trip and risk cache eviction / broken images.
+  // Generate image with Google Gemini 2.5 Flash Image ("Nano Banana").
+  // Returned as an inlined data URL so the browser doesn't need a second round-trip.
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
-    const imgRes = await fetch(sourceUrl, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!imgRes.ok) {
-      await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
-      res.status(502).json({ error: "Image generation service returned an error. Please try again." });
-      return;
-    }
-
-    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-    if (!contentType.startsWith("image/")) {
-      await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
-      res.status(502).json({ error: "Image generation service returned invalid content. Please try again." });
-      return;
-    }
-
-    const arrayBuffer = await imgRes.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
+    const { dataUrl } = await generateNanoBananaImage(imagePrompt, { timeoutMs: 120_000 });
     res.json({ imageUrl: dataUrl, prompt: imagePrompt });
   } catch (err: any) {
     await releaseReservation(imageReservation.reservationId, imageReservation.usedBonus);
     const isTimeout = err?.name === "AbortError";
-    res.status(isTimeout ? 504 : 500).json({
+    logger.error({ err: err?.message ?? err }, "Nano Banana image generation failed");
+    res.status(isTimeout ? 504 : 502).json({
       error: isTimeout
         ? "Image generation timed out. The AI service is busy — please try again."
         : "Image generation failed. Please try again.",

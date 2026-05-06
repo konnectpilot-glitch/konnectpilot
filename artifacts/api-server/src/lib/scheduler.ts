@@ -7,7 +7,7 @@ import {
   postsTable,
   workspacesTable,
 } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { generateClaudeText, generateNanoBananaImage } from "./ai-providers";
 import { logger } from "./logger";
 import { publishToFacebook, publishToInstagram, publishToLinkedIn } from "./publishers";
 
@@ -106,28 +106,16 @@ Polished, brand-appropriate, scroll-stopping. No text overlays.`;
 }
 
 async function generateContent(brand: any, platform: string, contentPrompt?: string | null) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
-    max_completion_tokens: 1024,
-    messages: [{ role: "user", content: buildCaption(brand, platform, contentPrompt) }],
-  });
-  return completion.choices[0]?.message?.content ?? "";
+  const { content } = await generateClaudeText(
+    buildCaption(brand, platform, contentPrompt),
+    { maxTokens: 1024 },
+  );
+  return content;
 }
 
-function buildImageUrl(prompt: string): string {
-  const seed = Math.floor(Math.random() * 999_999);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
-}
-
-async function prewarmImage(url: string): Promise<void> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
-    await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-  } catch (err) {
-    logger.warn({ err, url }, "Image pre-warm failed (continuing anyway)");
-  }
+async function generateImageDataUrl(prompt: string): Promise<string> {
+  const { dataUrl } = await generateNanoBananaImage(prompt, { timeoutMs: 120_000 });
+  return dataUrl;
 }
 
 async function publishOnePlatform(
@@ -196,8 +184,16 @@ export async function retryPost(postId: number, workspaceId: number): Promise<
   let imageUrl = post.imageUrl;
   if (!imageUrl) {
     const prompt = buildImagePrompt(brand, null, null);
-    imageUrl = buildImageUrl(prompt);
-    await prewarmImage(imageUrl);
+    try {
+      imageUrl = await generateImageDataUrl(prompt);
+    } catch (err: any) {
+      const msg = `Image generation failed: ${err?.message ?? err}`;
+      await db
+        .update(postsTable)
+        .set({ status: "failed", errorMessage: msg })
+        .where(eq(postsTable.id, postId));
+      return { ok: false, status: "failed", error: msg };
+    }
   }
 
   let caption = post.content;
@@ -323,7 +319,12 @@ async function processClaimedSlot(
     // Generate the caption + image so the admin can preview, then park the
     // row in pending_approval. Admin can approve to publish via the API.
     const imagePromptOnly = buildImagePrompt(brand, schedule.contentPrompt, schedule.imageStyle);
-    const previewImageUrl = buildImageUrl(imagePromptOnly);
+    let previewImageUrl: string | null = null;
+    try {
+      previewImageUrl = await generateImageDataUrl(imagePromptOnly);
+    } catch (err: any) {
+      logger.warn({ err: err?.message, scheduleId: schedule.id }, "Pending-approval image gen failed");
+    }
     let previewCaption = "";
     try {
       previewCaption = await generateContent(brand, platform, schedule.contentPrompt);
@@ -343,8 +344,18 @@ async function processClaimedSlot(
   }
 
   const imagePrompt = buildImagePrompt(brand, schedule.contentPrompt, schedule.imageStyle);
-  const imageUrl = buildImageUrl(imagePrompt);
-  await prewarmImage(imageUrl);
+  let imageUrl: string;
+  try {
+    imageUrl = await generateImageDataUrl(imagePrompt);
+  } catch (err: any) {
+    const msg = `Image generation failed: ${err?.message ?? err}`;
+    await db
+      .update(postsTable)
+      .set({ status: "failed", errorMessage: msg })
+      .where(eq(postsTable.id, postRowId));
+    logger.error({ err, scheduleId: schedule.id, platform }, "Image generation failed");
+    return;
+  }
 
   let caption = "";
   try {
