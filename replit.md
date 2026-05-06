@@ -16,11 +16,17 @@ lib/api-client-react/      → Generated React Query hooks
 
 ### Key Technologies
 - **Frontend**: React 18, Vite, Tailwind CSS, @clerk/react, TanStack Query, wouter, react-hook-form, date-fns, react-icons
-- **Backend**: Express 5, @clerk/express, @anthropic-ai/sdk (Claude claude-sonnet-4-5), stripe
+- **Backend**: Express 5, @clerk/express, @aws-sdk/client-bedrock-runtime (Claude on Bedrock), stripe
 - **Database**: PostgreSQL via Drizzle ORM
 - **Auth**: Clerk (dev keys configured)
-- **AI**: Anthropic Claude claude-sonnet-4-5 for content generation
+- **AI (text)**: Anthropic Claude on **AWS Bedrock** (`global.anthropic.claude-opus-4-7` inference profile, region `eu-north-1`) via Bedrock `ConverseCommand`. Auth uses `AWS_BEARER_TOKEN_BEDROCK` (Bedrock API key — no IAM keys needed).
+- **AI (image)**: Google Gemini 2.5 Flash Image (a.k.a. "Nano Banana") via REST. Auth uses `GOOGLE_API_KEY_NANO_BANNA`. Returns inline base64 → served as `data:image/...` URL.
+- Both providers wrapped in `artifacts/api-server/src/lib/ai-providers.ts` (`generateClaudeText`, `generateNanoBananaImage`). Used by `routes/generate.ts`, `routes/approval.ts`, `lib/scheduler.ts`, `lib/brand-memory.ts`, `lib/performance-memory.ts`.
 - **Payments**: Stripe subscriptions (Starter $19, Pro $49, Agency $99)
+
+### Schedule timezones
+- Each `posting_schedules` row has a `timezone` (IANA, e.g. `America/New_York`). The scheduler in `lib/scheduler.ts` uses `utcSlotForLocalTime(now, hh, mm, tz)` (Intl-based, DST-correct) to convert the user's wall-clock `postTimes` into the correct UTC instant for "today in tz" before claiming a slot.
+- Frontend `ScheduleForm` (artifacts/postpilot/src/pages/brand-detail.tsx) shows a timezone `<select>` defaulting to the browser's IANA tz; the "Post times" label and helper text update reactively.
 
 ### Database Schema
 - `users` — Clerk users synced on first request; has plan, stripeCustomerId, stripeSubscriptionId, activeWorkspaceId
