@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Qu78tK8vNK8gmDC0Baud7"
+uri = "file://exports/konnectpilot.tar.gz"
+type = "unspecified"
+title = "KonnectPilot project (source only, ready for local setup)"
