@@ -13,9 +13,10 @@ import {
   ClipboardCheck, Sparkles, Check, X as XIcon, Calendar as CalIcon, Pencil,
   Loader2, Trash2, Brain, Wand2, Facebook, Instagram, Linkedin, AlertCircle,
 } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/friendly-error";
 import { format, formatDistanceToNow } from "date-fns";
+import EmptyState from "@/components/empty-state";
 import { useWorkspace, hasRoleAtLeast } from "@/lib/workspaceContext";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,7 +58,6 @@ function PlatformIcon({ platform }: { platform: string }) {
   if (platform === "facebook") return <Facebook className="w-4 h-4 text-blue-600" />;
   if (platform === "instagram") return <Instagram className="w-4 h-4 text-pink-600" />;
   if (platform === "linkedin") return <Linkedin className="w-4 h-4 text-blue-700" />;
-  if (platform === "tiktok") return <FaTiktok className="w-3.5 h-3.5 text-foreground" />;
   return null;
 }
 
@@ -77,7 +77,12 @@ export default function ApprovalPage() {
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState<PostRow | null>(null);
-  const [batchOpen, setBatchOpen] = useState(false);
+  // Initialize batch-open from URL — `?batch=1` lets the Dashboard CTA and
+  // Cmd+K action deep-link straight into the batch generator.
+  const [batchOpen, setBatchOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("batch") === "1";
+  });
   const [memoryFor, setMemoryFor] = useState<number | null>(null);
 
   const { data: brands } = useListBrands();
@@ -151,7 +156,7 @@ export default function ApprovalPage() {
       const skipped = r.skipped.length;
       toast.success(`${vars.action} complete: ${ok} ok${skipped ? `, ${skipped} skipped` : ""}`);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Bulk action failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "The bulk action couldn't complete. Please try again.")),
   });
 
   const editPost = useMutation({
@@ -170,7 +175,7 @@ export default function ApprovalPage() {
       setEditing(null);
       toast.success("Post updated — your edit is feeding the brand AI memory");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Edit failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't save your edit. Please try again.")),
   });
 
   const generateBatch = useMutation({
@@ -192,7 +197,7 @@ export default function ApprovalPage() {
           (auto ? ` — AI auto-approved ${r.autoApproved}, rejected ${r.autoRejected}` : ""),
       );
     },
-    onError: (e: any) => toast.error(e?.message ?? "Batch generation failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Batch generation didn't complete. Please try again.")),
   });
 
   const updateBrand = useUpdateBrand();
@@ -246,7 +251,7 @@ export default function ApprovalPage() {
                             queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
                             toast.success(`${b.name} → ${v} mode`);
                           },
-                          onError: (e: any) => toast.error(e?.message ?? "Update failed"),
+                          onError: (e: any) => toast.error(friendlyError(e, "Couldn't update the post. Please try again.")),
                         },
                       );
                     }}
@@ -359,14 +364,23 @@ export default function ApprovalPage() {
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl">
-            <ClipboardCheck className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">No posts in this view yet.</p>
-            {tab === "pending" && canEdit && (
-              <Button onClick={() => setBatchOpen(true)} variant="outline" size="sm" className="mt-4 gap-2">
-                <Wand2 className="w-4 h-4" /> Generate a batch
-              </Button>
-            )}
+          <div className="border border-dashed border-border rounded-xl">
+            <EmptyState
+              icon={ClipboardCheck}
+              title={tab === "pending" ? "All caught up" : "Nothing here yet"}
+              description={
+                tab === "pending"
+                  ? "No posts are waiting on your approval. Generate a batch to fill the queue, or come back after your next round of drafts."
+                  : tab === "approved"
+                  ? "Approved drafts will land here. Approve one from the Pending tab and watch it appear."
+                  : "Rejected drafts get archived here so the AI can learn from what didn't work."
+              }
+              primaryCta={
+                tab === "pending" && canEdit
+                  ? { label: "Generate a batch", onClick: () => setBatchOpen(true), icon: Wand2 }
+                  : undefined
+              }
+            />
           </div>
         ) : (
           <div className="rounded-xl border border-border overflow-hidden">

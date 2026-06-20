@@ -13,4 +13,6 @@ export interface EditApprovalPostBody {
   imageUrl?: string | null;
   /** @nullable */
   scheduledFor?: string | null;
+  /** @nullable */
+  status?: "generated" | "scheduled" | null;
 }

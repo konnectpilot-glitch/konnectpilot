@@ -2,8 +2,9 @@ import Layout from "@/components/layout";
 import { Link } from "wouter";
 import { useListBrands, useDeleteBrand, getListBrandsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Building2, ChevronRight, Trash2, Zap } from "lucide-react";
+import { Plus, Building2, ChevronRight, Trash2, Zap, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import EmptyState from "@/components/empty-state";
 
 export default function BrandsPage() {
   const { data: brands, isLoading } = useListBrands();
@@ -50,16 +51,14 @@ export default function BrandsPage() {
             ))}
           </div>
         ) : (brands?.length ?? 0) === 0 ? (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
-            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">No brands yet</h2>
-            <p className="text-sm text-muted-foreground mb-4">Add your first brand to start generating AI-powered posts.</p>
-            <Link href="/brands/new" className="inline-flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
-              <Plus className="w-4 h-4" />
-              Create your first brand
-            </Link>
+          <div className="bg-card border border-border rounded-xl">
+            <EmptyState
+              icon={Building2}
+              title="No brands yet"
+              description="Brands are how KonnectPilot remembers each business's voice, audience, and content mix. Paste a URL and we'll fill most of the form for you."
+              primaryCta={{ label: "Create your first brand", href: "/brands/new", icon: Plus }}
+              secondaryCta={{ label: "Auto-fill from a URL", href: "/brands/new", icon: Wand2 }}
+            />
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

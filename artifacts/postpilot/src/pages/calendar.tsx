@@ -7,13 +7,11 @@ import {
   ChevronLeft, ChevronRight, CalendarDays, Plus,
   Facebook, Instagram, Linkedin,
 } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
 
 const PLATFORM_COLORS: Record<string, string> = {
   facebook: "bg-blue-100 text-blue-700 border-blue-200",
   instagram: "bg-pink-100 text-pink-700 border-pink-200",
   linkedin: "bg-sky-100 text-sky-700 border-sky-200",
-  tiktok: "bg-zinc-100 text-zinc-700 border-zinc-200",
 };
 
 const STATUS_RING: Record<string, string> = {
@@ -28,7 +26,6 @@ function PlatformDot({ platform }: { platform: string }) {
   if (platform === "facebook") return <Facebook className={`${cls} text-blue-600`} />;
   if (platform === "instagram") return <Instagram className={`${cls} text-pink-600`} />;
   if (platform === "linkedin") return <Linkedin className={`${cls} text-sky-700`} />;
-  if (platform === "tiktok") return <FaTiktok className={`${cls} text-foreground`} />;
   return null;
 }
 
@@ -90,7 +87,7 @@ export default function CalendarPage() {
 
   return (
     <Layout>
-      <div className="p-6 max-w-6xl mx-auto space-y-5">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Calendar</h1>

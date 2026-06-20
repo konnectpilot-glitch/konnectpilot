@@ -18,6 +18,7 @@ import ApprovalPage from "@/pages/approval";
 import BillingPage from "@/pages/billing";
 import SettingsPage from "@/pages/settings";
 import AccountsPage from "@/pages/accounts";
+import ConnectMetaPickerPage from "@/pages/accounts-connect-meta";
 import AnalyticsPage from "@/pages/analytics";
 import CalendarPage from "@/pages/calendar";
 import LibraryPage from "@/pages/library";
@@ -30,7 +31,20 @@ import PricingPage from "@/pages/marketing/pricing";
 import AffiliateLandingPage from "@/pages/marketing/affiliate";
 import AboutPage from "@/pages/marketing/about";
 import LegalPage from "@/pages/marketing/legal";
+import VersusPage, {
+  PREDIS_CONFIG,
+  OCOYA_CONFIG,
+  VISTA_CONFIG,
+  BUFFER_CONFIG,
+} from "@/pages/marketing/versus";
+import HashtagGeneratorPage from "@/pages/marketing/hashtag-generator";
+import BestTimeToPostPage from "@/pages/marketing/best-time-to-post";
+import ChangelogPage from "@/pages/marketing/changelog";
+import RoadmapPage from "@/pages/marketing/roadmap";
+import ReplyDrafterPage from "@/pages/reply-drafter";
+import InboxPage from "@/pages/inbox";
 import NotFound from "@/pages/not-found";
+import ErrorBoundary from "@/components/error-boundary";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -254,6 +268,18 @@ function ClerkProviderWithRoutes() {
           <Route path="/legal/terms" component={() => <LegalPage slug="terms" />} />
           <Route path="/legal/privacy" component={() => <LegalPage slug="privacy" />} />
           <Route path="/legal/cookies" component={() => <LegalPage slug="cookies" />} />
+          {/* Comparison SEO landing pages — target "predis alternative",
+              "ocoya vs konnectpilot", etc. Each is a long-tail intent page
+              that converts cheap CPC into trial signups. */}
+          <Route path="/vs/predis-ai" component={() => <VersusPage config={PREDIS_CONFIG} />} />
+          <Route path="/vs/ocoya" component={() => <VersusPage config={OCOYA_CONFIG} />} />
+          <Route path="/vs/vista-social" component={() => <VersusPage config={VISTA_CONFIG} />} />
+          <Route path="/vs/buffer" component={() => <VersusPage config={BUFFER_CONFIG} />} />
+          {/* Free lead-magnet tools — public, no sign-up. SEO + email capture. */}
+          <Route path="/tools/hashtag-generator" component={HashtagGeneratorPage} />
+          <Route path="/tools/best-time-to-post" component={BestTimeToPostPage} />
+          <Route path="/changelog" component={ChangelogPage} />
+          <Route path="/roadmap" component={RoadmapPage} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
@@ -269,9 +295,12 @@ function ClerkProviderWithRoutes() {
           <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
           <Route path="/accounts" component={() => <ProtectedRoute component={AccountsPage} />} />
+          <Route path="/accounts/connect/meta" component={() => <ProtectedRoute component={ConnectMetaPickerPage} />} />
           <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} />} />
           <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
           <Route path="/team" component={() => <ProtectedRoute component={TeamPage} />} />
+          <Route path="/reply-drafter" component={() => <ProtectedRoute component={ReplyDrafterPage} />} />
+          <Route path="/inbox" component={() => <ProtectedRoute component={InboxPage} />} />
           <Route path="/invite/:token" component={InvitePage} />
           <Route component={NotFound} />
         </Switch>
@@ -284,9 +313,11 @@ function ClerkProviderWithRoutes() {
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
-    </WouterRouter>
+    <ErrorBoundary>
+      <WouterRouter base={basePath}>
+        <ClerkProviderWithRoutes />
+      </WouterRouter>
+    </ErrorBoundary>
   );
 }
 

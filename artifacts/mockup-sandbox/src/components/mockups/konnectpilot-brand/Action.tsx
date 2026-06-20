@@ -305,20 +305,6 @@ export function Action() {
               </div>
             </div>
             
-            {/* Empty State Hint */}
-            <div className="mt-8 mb-16 flex items-center justify-between p-6 rounded-2xl border border-dashed" style={{ borderColor: colors.border, backgroundColor: 'transparent' }}>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white border shadow-sm" style={{ borderColor: colors.border }}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-black"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
-                </div>
-                <p className="text-[15px] font-medium">Connect TikTok to schedule across all five channels.</p>
-              </div>
-              <Button variant="outline" className="h-10 px-5 rounded-lg font-semibold text-[15px] flex items-center gap-2 hover:bg-blue-50" style={{ borderColor: colors.sky, color: colors.sky }}>
-                Connect TikTok
-                <ArrowRight size={16} />
-              </Button>
-            </div>
-
           </main>
         </div>
       </div>

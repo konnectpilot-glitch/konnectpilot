@@ -191,8 +191,8 @@ router.post("/billing/portal", requireAuth, async (req: any, res): Promise<void>
   }
 
   const stripe = new Stripe(stripeSecret);
-  const domains = process.env.REPLIT_DOMAINS?.split(",")[0] || "localhost";
-  const returnUrl = `https://${domains}/billing`;
+  const appUrl = process.env.APP_URL ?? "http://localhost:25960";
+  const returnUrl = `${appUrl.replace(/\/$/, "")}/billing`;
 
   const session = await stripe.billingPortal.sessions.create({
     customer: user.stripeCustomerId,

@@ -77,7 +77,7 @@ export default function AboutPage() {
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <div className="bg-primary rounded-2xl px-8 py-10 text-center">
-          <h2 className="text-2xl font-bold text-primary-foreground mb-3">Try KonnectPilot free for 7 days</h2>
+          <h2 className="text-2xl font-bold text-primary-foreground mb-3">Start 7-day free trial for 7 days</h2>
           <Link
             href="/sign-up"
             className="inline-flex items-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90"

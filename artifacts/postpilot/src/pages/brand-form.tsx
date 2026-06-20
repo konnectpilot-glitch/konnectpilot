@@ -1,66 +1,302 @@
 import Layout from "@/components/layout";
 import { Link, useLocation } from "wouter";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
+import { useState } from "react";
 import {
   useCreateBrand,
   getListBrandsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, X, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/friendly-error";
+import { extractColors } from "@/lib/extract-colors";
+import { useAuth } from "@clerk/react";
+import { useWorkspace } from "@/lib/workspaceContext";
 
-const TONES = [
-  { id: "friendly", label: "Friendly" },
-  { id: "professional", label: "Professional" },
-  { id: "fun", label: "Fun" },
-  { id: "inspirational", label: "Inspirational" },
-];
+const MAX_LOGOS = 3;
+const MAX_LOGO_BYTES = 700 * 1024; // 700 KB raw, matches backend
+const ACCEPTED_MIME = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+
+function readFileAsDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 type FormData = {
   name: string;
   industry: string;
-  tone: "friendly" | "professional" | "fun" | "inspirational";
   targetAudience: string;
   keywords: string;
+  voiceDescription: string;
+  examplePosts: string;
+  doDontRules: string;
+  // Phase 2 (logos managed in separate useState — not via react-hook-form)
+  websiteUrl: string;
+  brandColorPrimary: string;
+  brandColorSecondary: string;
+  pillarEducate: number;
+  pillarSpotlight: number;
+  pillarReviews: number;
+  pillarBts: number;
+  pillarPromo: number;
+  toneInstagram: string;
+  toneFacebook: string;
+  toneLinkedin: string;
 };
 
 export default function BrandFormPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createBrand = useCreateBrand();
+  const { getToken } = useAuth();
+  const { activeWorkspace } = useWorkspace();
+  const [logos, setLogos] = useState<string[]>([]); // array of data URIs
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  // Auto-fill from website state. The audit called out the new-brand form
+  // as 14 clicks to first post; pasting a URL + 1 click is a 90% reduction
+  // in friction for ecommerce sellers who already have a public site.
+  const [extractUrl, setExtractUrl] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  // Auto-extracted palette from the first uploaded logo. We surface the top
+  // 4-5 hues as clickable swatches under the color inputs — picking colors
+  // by hand from a logo is tedious, this turns it into a one-click choice.
+  const [suggestedColors, setSuggestedColors] = useState<string[]>([]);
+  const [extractingColors, setExtractingColors] = useState(false);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!files.length) return;
+    if (logos.length + files.length > MAX_LOGOS) {
+      toast.error(`Max ${MAX_LOGOS} logos. You already have ${logos.length}.`);
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const newLogos: string[] = [];
+      for (const file of files) {
+        if (!ACCEPTED_MIME.includes(file.type)) {
+          toast.error(`${file.name}: unsupported format (png, jpg, webp, svg only)`);
+          continue;
+        }
+        if (file.size > MAX_LOGO_BYTES) {
+          toast.error(`${file.name}: file is ${Math.round(file.size / 1024)}KB, max is ${Math.round(MAX_LOGO_BYTES / 1024)}KB`);
+          continue;
+        }
+        newLogos.push(await readFileAsDataUri(file));
+      }
+      if (newLogos.length) {
+        setLogos((prev) => [...prev, ...newLogos]);
+        // Kick off color extraction from the first newly-uploaded logo. We
+        // do it in the background so the upload feels instant; the swatches
+        // and color inputs update once the extractor finishes (~tens of ms
+        // for a small logo). Only run when there were no logos before — the
+        // primary logo is the reference, secondary uploads shouldn't blow
+        // away the user's picked palette.
+        if (logos.length === 0) {
+          void autoExtractColors(newLogos[0]);
+        }
+      }
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function autoExtractColors(logoDataUri: string) {
+    setExtractingColors(true);
+    try {
+      const colors = await extractColors(logoDataUri, { count: 5 });
+      if (!colors.length) {
+        // Probably a single-color logo on a white bg — not an error, just
+        // means there's nothing to suggest. Silent fail is the right call.
+        return;
+      }
+      setSuggestedColors(colors);
+      // Only auto-fill empty fields so we don't surprise a user who already
+      // typed their hex codes. Read from react-hook-form (not the DOM) —
+      // the colour-picker input has a default value of #000000 even when the
+      // form value is empty, which would otherwise make this check fail.
+      // Treat blank, missing, and pure-black as "empty".
+      const isEmpty = (v: unknown) =>
+        !v || (typeof v === "string" && (v.trim() === "" || v.trim().toLowerCase() === "#000000"));
+      const vals = getValues();
+      if (isEmpty(vals.brandColorPrimary) && colors[0]) {
+        setValue("brandColorPrimary", colors[0], { shouldDirty: true });
+      }
+      if (isEmpty(vals.brandColorSecondary) && colors[1]) {
+        setValue("brandColorSecondary", colors[1], { shouldDirty: true });
+      }
+      toast.success(
+        colors.length > 1
+          ? `Picked ${colors.length} colors from your logo — tap a swatch to swap`
+          : "Picked a primary color from your logo",
+      );
+    } catch (err) {
+      // Color extraction is a nice-to-have; never block the user if it fails.
+      // eslint-disable-next-line no-console
+      console.warn("Color extraction failed", err);
+    } finally {
+      setExtractingColors(false);
+    }
+  }
+
+  // When the user picks a swatch, apply it to whichever field they "aim" at —
+  // we treat the first click as primary, second as secondary, third resets.
+  function applySwatch(color: string, target: "primary" | "secondary") {
+    setValue(
+      target === "primary" ? "brandColorPrimary" : "brandColorSecondary",
+      color,
+    );
+  }
+
+  function removeLogo(index: number) {
+    setLogos((prev) => prev.filter((_, i) => i !== index));
+  }
 
   const {
     register,
     handleSubmit,
-    control,
+    watch,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     defaultValues: {
       name: "",
       industry: "",
-      tone: "professional",
       targetAudience: "",
       keywords: "",
+      voiceDescription: "",
+      examplePosts: "",
+      doDontRules: "",
+      websiteUrl: "",
+      brandColorPrimary: "",
+      brandColorSecondary: "",
+      pillarEducate: 30,
+      pillarSpotlight: 30,
+      pillarReviews: 20,
+      pillarBts: 10,
+      pillarPromo: 10,
+      toneInstagram: "",
+      toneFacebook: "",
+      toneLinkedin: "",
     },
   });
 
+  // Live pillar sum so user sees feedback if percentages don't add to 100
+  const pillarSum =
+    Number(watch("pillarEducate") || 0) +
+    Number(watch("pillarSpotlight") || 0) +
+    Number(watch("pillarReviews") || 0) +
+    Number(watch("pillarBts") || 0) +
+    Number(watch("pillarPromo") || 0);
+
+  async function handleAutoFill() {
+    const raw = extractUrl.trim();
+    if (!raw) {
+      toast.error("Paste your website URL first");
+      return;
+    }
+    // Normalize: people forget to add scheme. Add https:// by default.
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    setExtracting(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/brands/extract", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeWorkspace ? { "X-Workspace-Id": String(activeWorkspace.id) } : {}),
+        },
+        body: JSON.stringify({ url: normalized }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.error ?? `Couldn't read that page (${res.status})`);
+      }
+      const data = await res.json();
+      // Only overwrite fields if the AI returned something for them; empty
+      // strings would clobber whatever the user already typed.
+      if (data.name) setValue("name", data.name, { shouldValidate: true });
+      if (data.industry) setValue("industry", data.industry, { shouldValidate: true });
+      if (data.targetAudience) setValue("targetAudience", data.targetAudience, { shouldValidate: true });
+      if (data.keywords) setValue("keywords", data.keywords, { shouldValidate: true });
+      if (data.voice) setValue("voiceDescription", data.voice);
+      // Always set the websiteUrl field too — they paid for the extract,
+      // make sure that URL doesn't get lost.
+      setValue("websiteUrl", normalized);
+      toast.success("Filled from your website — review and tweak as needed");
+    } catch (err: any) {
+      toast.error(friendlyError(err, "Couldn't read that page — try a different URL or fill in manually."));
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   async function onSubmit(data: FormData) {
+    if (pillarSum !== 100) {
+      toast.error(`Content pillar percentages must sum to 100 (currently ${pillarSum}).`);
+      return;
+    }
+
+    const platformOverrides: Record<string, string> = {};
+    if (data.toneInstagram.trim()) platformOverrides.instagram = data.toneInstagram.trim();
+    if (data.toneFacebook.trim()) platformOverrides.facebook = data.toneFacebook.trim();
+    if (data.toneLinkedin.trim()) platformOverrides.linkedin = data.toneLinkedin.trim();
+
+    // Audit v2: only name + industry are required. If the user skipped the
+    // optional details, fill in safe defaults so the API contract stays
+    // happy and the AI still has *something* to work with.
+    const safeTargetAudience = data.targetAudience.trim() || `Customers in the ${data.industry.trim()} space who care about quality and value`;
+    const safeKeywords = data.keywords.trim() || data.industry.trim();
+
+    const payload: any = {
+      name: data.name,
+      industry: data.industry,
+      targetAudience: safeTargetAudience,
+      keywords: safeKeywords,
+      voiceDescription: data.voiceDescription.trim() || null,
+      examplePosts: data.examplePosts.trim() || null,
+      doDontRules: data.doDontRules.trim() || null,
+      logos: logos.length ? logos : null,
+      websiteUrl: data.websiteUrl.trim() || null,
+      brandColorPrimary: data.brandColorPrimary.trim() || null,
+      brandColorSecondary: data.brandColorSecondary.trim() || null,
+      contentPillars: {
+        educate: Number(data.pillarEducate),
+        spotlight: Number(data.pillarSpotlight),
+        reviews: Number(data.pillarReviews),
+        bts: Number(data.pillarBts),
+        promo: Number(data.pillarPromo),
+      },
+      platformOverrides: Object.keys(platformOverrides).length ? platformOverrides : null,
+    };
+
     createBrand.mutate(
-      { data },
+      { data: payload },
       {
         onSuccess: (brand: any) => {
           queryClient.invalidateQueries({ queryKey: getListBrandsQueryKey() });
           toast.success("Brand created — set up a posting schedule next");
           setLocation(brand?.id ? `/brands/${brand.id}` : "/brands");
         },
-        onError: (err: any) => toast.error(err?.data?.error ?? "Failed to create brand"),
+        onError: (err: any) => toast.error(friendlyError(err, "Couldn't create the brand. Please try again.")),
       }
     );
   }
 
+  const inputCls = "w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
+
   return (
     <Layout>
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/brands" className="text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
@@ -68,20 +304,59 @@ export default function BrandFormPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Create Brand</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Set up your brand's identity. You'll add posting schedules on the next screen.
+              The more we know about your brand, the better the AI sounds like you.
             </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {/* Auto-fill shortcut: paste a URL, let AI infer the basics + voice.
+              For ecommerce sellers who already have a public site, this turns a
+              5-section form into a 1-click action. */}
+          <div className="bg-gradient-to-br from-primary/10 via-purple-500/5 to-background border border-primary/30 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <h2 className="font-semibold text-foreground text-sm">Auto-fill from your website</h2>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">AI</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Paste your store URL — we'll read it and fill in your brand name, industry, audience, voice, and keywords. You can tweak everything before saving.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={extractUrl}
+                onChange={(e) => setExtractUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (!extracting) handleAutoFill();
+                  }
+                }}
+                placeholder="yourstore.com"
+                className={`${inputCls} flex-1`}
+                disabled={extracting}
+              />
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                disabled={extracting || !extractUrl.trim()}
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground font-medium px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-60 whitespace-nowrap"
+              >
+                {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                {extracting ? "Reading…" : "Auto-fill"}
+              </button>
+            </div>
+          </div>
+
+          {/* Section 1: Basics */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="font-semibold text-foreground text-sm">Brand Identity</h2>
+            <h2 className="font-semibold text-foreground text-sm">Brand basics</h2>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Brand Name *</label>
               <input
                 {...register("name", { required: "Brand name is required" })}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={inputCls}
                 placeholder="e.g. Acme Coffee Co."
               />
               {errors.name && <p className="text-destructive text-xs mt-1">{errors.name.message}</p>}
@@ -91,58 +366,338 @@ export default function BrandFormPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">Industry *</label>
               <input
                 {...register("industry", { required: "Industry is required" })}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={inputCls}
                 placeholder="e.g. Coffee & Cafes, Real Estate, Fitness"
               />
               {errors.industry && <p className="text-destructive text-xs mt-1">{errors.industry.message}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Tone of Voice *</label>
-              <Controller
-                name="tone"
-                control={control}
-                render={({ field }) => (
-                  <div className="grid grid-cols-2 gap-2">
-                    {TONES.map(({ id, label }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => field.onChange(id)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                          field.value === id
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-background text-foreground hover:bg-secondary"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Target Audience *</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Target Audience{" "}
+                <span className="text-muted-foreground font-normal">(optional — we'll guess from industry)</span>
+              </label>
               <input
-                {...register("targetAudience", { required: "Target audience is required" })}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                {...register("targetAudience")}
+                className={inputCls}
                 placeholder="e.g. Small business owners aged 25-45"
               />
-              {errors.targetAudience && <p className="text-destructive text-xs mt-1">{errors.targetAudience.message}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Keywords *</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Keywords{" "}
+                <span className="text-muted-foreground font-normal">(optional — we'll use your industry)</span>
+              </label>
               <input
-                {...register("keywords", { required: "Keywords are required" })}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                {...register("keywords")}
+                className={inputCls}
                 placeholder="e.g. coffee, sustainability, morning routine"
               />
               <p className="text-xs text-muted-foreground mt-1">Comma-separated keywords AI will weave into posts</p>
             </div>
           </div>
+
+          <div className="text-xs text-muted-foreground text-center -my-2">
+            <span className="bg-secondary/40 px-3 py-1.5 rounded-full inline-flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-primary" />
+              The sections below are <strong>optional</strong> — but each one makes the AI sharper.
+            </span>
+          </div>
+
+          {/* Section 2: Voice — collapsible (audit v2 progressive disclosure) */}
+          <details className="bg-card border border-border rounded-xl group">
+            <summary className="flex items-center justify-between cursor-pointer p-5 list-none">
+              <div>
+                <h2 className="font-semibold text-foreground text-sm">Brand voice</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The single biggest lever on output quality. Skip if you'd rather let the AI guess.
+                </p>
+              </div>
+              <span className="text-muted-foreground group-open:rotate-45 transition-transform text-2xl leading-none">+</span>
+            </summary>
+            <div className="px-5 pb-5 space-y-4">
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Describe your brand voice (3–5 sentences)</label>
+              <textarea
+                {...register("voiceDescription")}
+                rows={4}
+                className={inputCls}
+                placeholder="e.g. Warm and direct, like talking to a friend who happens to know coffee. Confident but never salesy. Uses parenthetical asides. Never uses emojis."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Paste 2–3 example posts that sound exactly like you</label>
+              <textarea
+                {...register("examplePosts")}
+                rows={6}
+                className={`${inputCls} font-mono`}
+                placeholder={"Separate multiple posts with a line of three dashes:\n\nPost 1 caption goes here...\n\n---\n\nPost 2 caption goes here..."}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Few-shot examples teach the AI your voice better than any description.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Anything we should always include or never say?</label>
+              <textarea
+                {...register("doDontRules")}
+                rows={4}
+                className={inputCls}
+                placeholder={"✅ Always say: \"handcrafted\", \"small batch\", free shipping\n❌ Never say: \"cheap\", \"discount\"; avoid 🤖 emojis"}
+              />
+            </div>
+            </div>
+          </details>
+
+          {/* Section 3: Visual identity — collapsible */}
+          <details className="bg-card border border-border rounded-xl group">
+            <summary className="flex items-center justify-between cursor-pointer p-5 list-none">
+              <div>
+                <h2 className="font-semibold text-foreground text-sm">Visual identity</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Logo + brand colors carry through to AI-generated images.
+                </p>
+              </div>
+              <span className="text-muted-foreground group-open:rotate-45 transition-transform text-2xl leading-none">+</span>
+            </summary>
+            <div className="px-5 pb-5 space-y-4">
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Brand logos ({logos.length}/{MAX_LOGOS})
+              </label>
+              <div className="grid grid-cols-3 gap-3 mb-2">
+                {logos.map((dataUri, i) => (
+                  <div
+                    key={i}
+                    className="relative aspect-square border border-border rounded-lg overflow-hidden bg-secondary/30 group"
+                  >
+                    <img
+                      src={dataUri}
+                      alt={`Logo ${i + 1}`}
+                      className="w-full h-full object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeLogo(i)}
+                      className="absolute top-1 right-1 bg-background/90 border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+                      aria-label="Remove logo"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {i === 0 && (
+                      <div className="absolute bottom-1 left-1 bg-background/90 border border-border rounded text-[10px] px-1.5 py-0.5 font-medium">
+                        Primary
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {logos.length < MAX_LOGOS && (
+                  <label
+                    className={`aspect-square border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary hover:bg-secondary/30 transition-colors ${uploadingLogo ? "opacity-50 pointer-events-none" : ""}`}
+                  >
+                    <input
+                      type="file"
+                      accept={ACCEPTED_MIME.join(",")}
+                      multiple
+                      className="sr-only"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                    />
+                    {uploadingLogo ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Upload className="w-5 h-5 text-muted-foreground" />
+                    )}
+                    <span className="text-xs text-muted-foreground">Upload</span>
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Up to {MAX_LOGOS} variants (primary, monochrome, square, etc.). PNG / JPG / WebP / SVG. Max {Math.round(MAX_LOGO_BYTES / 1024)}KB each. The first logo is used as a visual reference for AI image generation in production.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Website URL</label>
+              <input
+                {...register("websiteUrl")}
+                type="url"
+                className={inputCls}
+                placeholder="https://yourstore.com"
+              />
+              <p className="text-xs text-muted-foreground mt-1">AI mentions this where appropriate in captions.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Primary color</label>
+                <div className="flex gap-2">
+                  <input
+                    {...register("brandColorPrimary")}
+                    type="color"
+                    className="h-10 w-14 border border-border rounded-lg cursor-pointer bg-background"
+                  />
+                  <input
+                    {...register("brandColorPrimary")}
+                    className={inputCls}
+                    placeholder="#ff5500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Secondary color</label>
+                <div className="flex gap-2">
+                  <input
+                    {...register("brandColorSecondary")}
+                    type="color"
+                    className="h-10 w-14 border border-border rounded-lg cursor-pointer bg-background"
+                  />
+                  <input
+                    {...register("brandColorSecondary")}
+                    className={inputCls}
+                    placeholder="#0066ff"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Auto-extracted palette. Renders only when we found colors in
+                the uploaded logo. Click sets primary; right-click sets
+                secondary — keyboard a11y via context-menu key works too. */}
+            {(extractingColors || suggestedColors.length > 0) && (
+              <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">
+                    {extractingColors ? "Picking colors from your logo…" : "Colors from your logo"}
+                  </span>
+                </div>
+                {extractingColors ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Analyzing pixels…
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 flex-wrap mb-1.5">
+                      {suggestedColors.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => applySwatch(color, "primary")}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            applySwatch(color, "secondary");
+                          }}
+                          className="group relative w-9 h-9 rounded-lg border border-border hover:scale-110 transition-transform shadow-sm"
+                          style={{ backgroundColor: color }}
+                          title={`Click → set as primary · Right-click → set as secondary (${color})`}
+                          aria-label={`Use ${color}`}
+                        >
+                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-mono text-muted-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                            {color}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-3">
+                      Click a swatch to set it as primary, right-click for secondary.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          </details>
+
+          {/* Section 4: Content mix (pillars) — collapsible */}
+          <details className="bg-card border border-border rounded-xl group">
+            <summary className="flex items-center justify-between cursor-pointer p-5 list-none">
+              <div>
+                <h2 className="font-semibold text-foreground text-sm">Content mix</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Share of posts by type. Defaults sum to 100 — adjust if you want.
+                </p>
+              </div>
+              <span className="text-muted-foreground group-open:rotate-45 transition-transform text-2xl leading-none">+</span>
+            </summary>
+            <div className="px-5 pb-5 space-y-4">
+
+            {[
+              { name: "pillarEducate", label: "🎓 Educational tips", hint: "How-tos, tips, industry knowledge" },
+              { name: "pillarSpotlight", label: "🛍️ Product spotlights", hint: "Highlight a product or service" },
+              { name: "pillarReviews", label: "💬 Customer stories", hint: "Testimonials, reviews-driven" },
+              { name: "pillarBts", label: "🏠 Behind-the-scenes", hint: "Process, team, packaging" },
+              { name: "pillarPromo", label: "🔥 Promotions", hint: "Offers, sales, limited-time" },
+            ].map(({ name, label, hint }) => (
+              <div key={name} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-foreground">{label}</div>
+                  <div className="text-xs text-muted-foreground">{hint}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <input
+                    {...register(name as keyof FormData, { valueAsNumber: true, min: 0, max: 100 })}
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="w-16 border border-border rounded-lg px-2 py-1.5 text-sm bg-background text-foreground text-right"
+                  />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+            ))}
+
+            <div className={`text-xs font-medium ${pillarSum === 100 ? "text-muted-foreground" : "text-destructive"}`}>
+              Sum: {pillarSum} / 100
+            </div>
+            </div>
+          </details>
+
+          {/* Section 5: Per-platform tone overrides — collapsible */}
+          <details className="bg-card border border-border rounded-xl group">
+            <summary className="flex items-center justify-between cursor-pointer p-5 list-none">
+              <div>
+                <h2 className="font-semibold text-foreground text-sm">Per-platform tone</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tweak the voice differently on Instagram vs LinkedIn. Leave blank to use the base voice everywhere.
+                </p>
+              </div>
+              <span className="text-muted-foreground group-open:rotate-45 transition-transform text-2xl leading-none">+</span>
+            </summary>
+            <div className="px-5 pb-5 space-y-4">
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Instagram tone tweak</label>
+              <input
+                {...register("toneInstagram")}
+                className={inputCls}
+                placeholder="e.g. more casual, lots of emojis"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Facebook tone tweak</label>
+              <input
+                {...register("toneFacebook")}
+                className={inputCls}
+                placeholder="e.g. friendly community focus, ask questions"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">LinkedIn tone tweak</label>
+              <input
+                {...register("toneLinkedin")}
+                className={inputCls}
+                placeholder="e.g. professional, industry insights, no slang"
+              />
+            </div>
+            </div>
+          </details>
 
           <div className="flex gap-3">
             <Link href="/brands" className="flex-1 text-center border border-border text-foreground font-medium px-4 py-2.5 rounded-lg hover:bg-secondary transition-colors text-sm">

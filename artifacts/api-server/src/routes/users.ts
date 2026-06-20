@@ -11,6 +11,7 @@ import {
   postsTable,
   postingSchedulesTable,
   socialAccountsTable,
+  emailDeliveriesTable,
 } from "@workspace/db";
 import {
   GetMeResponse,
@@ -18,6 +19,8 @@ import {
   UpdateMeResponse,
 } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import { sendEmail } from "../lib/email";
+import { welcomeEmail } from "../lib/email-templates";
 
 const router: IRouter = Router();
 
@@ -53,6 +56,10 @@ async function ensureUser(clerkId: string, email: string) {
   // Fast path: user already exists, no bootstrap needed.
   let [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
   let personal: typeof workspacesTable.$inferSelect | undefined;
+  // Track whether we created the user inside this call so we can fire the
+  // welcome email AFTER the transaction commits — never inside it (so the
+  // request hot path doesn't block on an outbound HTTP request).
+  let isNewUser = false;
 
   if (!user) {
     // Bootstrap path. The dashboard fires many parallel requests on first
@@ -96,6 +103,7 @@ async function ensureUser(clerkId: string, email: string) {
           .insert(usersTable)
           .values({ clerkId, email: resolvedEmail, plan: "free" })
           .returning();
+        isNewUser = true;
       }
 
       // Personal workspace.
@@ -245,6 +253,39 @@ async function ensureUser(clerkId: string, email: string) {
         .where(eq(usersTable.id, user.id))
         .returning();
     }
+  }
+
+  // Fire the welcome email for brand-new users. Fire-and-forget so the
+  // request returns instantly; if RESEND_API_KEY isn't set, sendEmail logs
+  // and no-ops, so dev environments stay quiet.
+  if (isNewUser && user?.email && !user.email.endsWith("@users.noreply.konnectpilot.local")) {
+    const appUrl = (process.env.APP_URL ?? "http://localhost:25960").replace(/\/$/, "");
+    const ctaUrl = `${appUrl}/brands/new`;
+    const tpl = welcomeEmail({
+      appUrl,
+      ctaUrl,
+      firstName: null, // we don't have first name here; Clerk has it but adds a round-trip
+    });
+    const userId = user.id;
+    void (async () => {
+      const result = await sendEmail({
+        to: user.email,
+        subject: tpl.subject,
+        html: tpl.html,
+        text: tpl.text,
+        tag: "welcome",
+      });
+      // Log the delivery regardless of outcome (sent / skipped / failed) so
+      // we don't double-send when the same user signs in again later.
+      try {
+        await db
+          .insert(emailDeliveriesTable)
+          .values({ userId, kind: "welcome", resendMessageId: result.id ?? null })
+          .onConflictDoNothing();
+      } catch {
+        // best-effort — duplicate-key races are fine
+      }
+    })();
   }
 
   return user;

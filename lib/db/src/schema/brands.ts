@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -12,6 +12,33 @@ export const brandsTable = pgTable("brands", {
   tone: text("tone").notNull().default("friendly"),
   targetAudience: text("target_audience").notNull(),
   keywords: text("keywords").notNull(),
+  // Phase 1 brand-redesign fields (BRAND_REDESIGN.md). Nullable so existing
+  // brand records remain valid; buildPrompt prefers these when populated.
+  voiceDescription: text("voice_description"),
+  examplePosts: text("example_posts"),
+  doDontRules: text("do_dont_rules"),
+  // Phase 2 brand-redesign fields (BRAND_REDESIGN.md, line 292-298).
+  // logoUrl: pasted image URL; passed to nano-banana-2 as reference image.
+  // brandColor*: hex like #ff5500; injected into image prompt.
+  // contentPillars: {educate, spotlight, reviews, bts, promo} percentages
+  //   summing to 100; scheduler uses weighted random to pick a pillar per post.
+  // platformOverrides: {instagram, facebook, linkedin} optional tone tweaks
+  //   that override voiceDescription on a per-platform basis.
+  // Phase 2 brand-redesign: up to 3 logo variants (primary, monochrome, square)
+  // stored as base64 data URIs. Each item is `data:<mime>;base64,<...>`.
+  // MVP storage — bytes live in the brand row. Move to R2/S3 before scaling.
+  logos: text("logos").array(),
+  websiteUrl: text("website_url"),
+  brandColorPrimary: text("brand_color_primary"),
+  brandColorSecondary: text("brand_color_secondary"),
+  contentPillars: jsonb("content_pillars").$type<{
+    educate: number;
+    spotlight: number;
+    reviews: number;
+    bts: number;
+    promo: number;
+  }>(),
+  platformOverrides: jsonb("platform_overrides").$type<Record<string, string>>(),
   platforms: text("platforms").array().notNull().default([]),
   postTime: text("post_time").notNull().default("09:00"),
   active: boolean("active").notNull().default(true),

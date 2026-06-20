@@ -1,0 +1,310 @@
+import { Link } from "wouter";
+import {
+  Sparkles,
+  ArrowRight,
+  Wand2,
+  Brain,
+  Calendar,
+  Search,
+  Moon,
+  Palette,
+  Layout,
+  AlertCircle,
+  Zap,
+  Building2,
+  CreditCard,
+  MessageSquare,
+  type LucideIcon,
+} from "lucide-react";
+import MarketingShell from "@/components/marketing-shell";
+
+// Public changelog — Linear / Vercel / Resend style. Building this page is
+// itself a "premium SaaS" signal (Section 16 of audit v2). Each entry is
+// dated and tagged so we can later filter or wire RSS / email-on-publish.
+//
+// For now entries are hardcoded; once we ship 50+ entries we'll move this to
+// MDX-on-disk or a thin CMS so non-engineers can write entries.
+
+type EntryTag = "feature" | "improvement" | "fix" | "performance" | "design";
+
+interface Entry {
+  date: string; // ISO YYYY-MM-DD
+  title: string;
+  tags: EntryTag[];
+  highlights: { icon: LucideIcon; label: string; body: string }[];
+  /** Optional "what's next" hint — useful for tying together feature arcs. */
+  whatsNext?: string;
+}
+
+// Dark-mode-aware changelog tag colors.
+const TAG_STYLES: Record<EntryTag, string> = {
+  feature: "bg-primary/10 text-primary",
+  improvement: "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  fix: "bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  performance: "bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  design: "bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300",
+};
+
+const ENTRIES: Entry[] = [
+  {
+    date: "2026-05-19",
+    title: "Image variants, caption angles, public roadmap, transparent logo overlay",
+    tags: ["feature", "improvement"],
+    highlights: [
+      {
+        icon: Sparkles,
+        label: "3 image variants per generate",
+        body: "Generate 3 distinct image options in parallel — different angles, lighting, mood. Pick the one that fits. Switch variants for free (no new credit) and the logo overlay re-applies automatically.",
+      },
+      {
+        icon: Wand2,
+        label: "3 caption angles per draft",
+        body: "Get three caption alternatives in different hook archetypes (contrarian, story-tease, stat) for any platform. Click 'Get 3 angles' on any draft.",
+      },
+      {
+        icon: Layout,
+        label: "Public roadmap",
+        body: "Shipped / In progress / Planned columns at /roadmap. Premium SaaS signal and a way for early customers to see what's coming next.",
+      },
+      {
+        icon: Search,
+        label: "Recent posts inbox in Reply Drafter",
+        body: "Pick one of your recently-published posts to draft a reply against, instead of pasting captions every time. Auto-fills platform too.",
+      },
+      {
+        icon: Brain,
+        label: "Promote post → brand voice example",
+        body: "Hit the star on any approved post to add it to your brand's example bank. Every promoted example compounds future caption quality.",
+      },
+      {
+        icon: Zap,
+        label: "'Generate a month' CTA in dashboard + Cmd+K",
+        body: "The bulk-generation flow is now reachable from the Dashboard hero, Quick Actions, and ⌘K.",
+      },
+    ],
+    whatsNext: "Shopify App Store listing and a real comment inbox (auto-fetched from FB/IG) are next.",
+  },
+  {
+    date: "2026-05-18",
+    title: "Auto-color picker, comparison pages, free SEO tools",
+    tags: ["feature", "design"],
+    highlights: [
+      {
+        icon: Palette,
+        label: "Auto-color picker",
+        body: "Upload a logo → KonnectPilot pulls the 5 dominant colors and pre-fills your primary + secondary. Click a swatch to swap; right-click to set the secondary.",
+      },
+      {
+        icon: Search,
+        label: "Comparison SEO pages",
+        body: "New /vs/predis-ai, /vs/ocoya, /vs/vista-social, /vs/buffer pages — honest, specific, with what each competitor does better and worse.",
+      },
+      {
+        icon: Wand2,
+        label: "Free public tools",
+        body: "Hashtag generator and best-time-to-post calculator — both free, no sign-up. Hashtag tool runs entirely in your browser.",
+      },
+      {
+        icon: Layout,
+        label: "Brand form progressive disclosure",
+        body: "Brand creation is now 2 required fields (name + industry); voice, visuals, content mix, and per-platform tone are all collapsed by default.",
+      },
+    ],
+    whatsNext: "Pinterest publishing and Shopify App Store listing are next on the roadmap.",
+  },
+  {
+    date: "2026-05-17",
+    title: "Brand voice auto-extract, multi-platform generate, Cmd+K",
+    tags: ["feature", "improvement"],
+    highlights: [
+      {
+        icon: Wand2,
+        label: "Brand voice from your URL",
+        body: "Paste your store URL and KonnectPilot reads your homepage to infer your brand name, industry, audience, voice, and keywords in about 10 seconds — no 12-field form.",
+      },
+      {
+        icon: Sparkles,
+        label: "Multi-platform generate",
+        body: "One brief writes Facebook, Instagram, and LinkedIn drafts at the same time — each tuned for that platform's audience.",
+      },
+      {
+        icon: Brain,
+        label: "Brand Intelligence panel",
+        body: "Every brand page now shows what KonnectPilot has learned: approved samples, distilled guidelines, top hooks, recent feedback signals.",
+      },
+      {
+        icon: Search,
+        label: "Cmd+K command bar",
+        body: "Jump to any page, brand, or quick action from anywhere in the app. ⌘K or Ctrl+K.",
+      },
+      {
+        icon: Moon,
+        label: "Dark mode",
+        body: "Toggle from the top bar. Light / Dark / Follow-system, persisted across sessions.",
+      },
+    ],
+  },
+  {
+    date: "2026-05-16",
+    title: "Onboarding wizard, US pricing, friendlier errors",
+    tags: ["feature", "improvement", "design"],
+    highlights: [
+      {
+        icon: Zap,
+        label: "3-step onboarding wizard",
+        body: "First-time users now see a 3-step setup: brand basics → connect socials → generate first post. Collapses what used to be a 14-click activation path.",
+      },
+      {
+        icon: CreditCard,
+        label: "USD pricing — $29 / $79 / $199",
+        body: "New US-market pricing with bumped credit allotments (200 / 600 / 2,000 per month). Top-up packs still roll over.",
+      },
+      {
+        icon: AlertCircle,
+        label: "Friendly errors everywhere",
+        body: "Raw API errors are now translated to plain-English toasts. A root error boundary catches React crashes with a retry button.",
+      },
+    ],
+  },
+  {
+    date: "2026-05-14",
+    title: "Brand-vise social accounts, scheduled-post sweep",
+    tags: ["feature", "fix"],
+    highlights: [
+      {
+        icon: Building2,
+        label: "Per-brand social account assignment",
+        body: "Connect a social account once at the workspace level, then assign it to specific brands. Agencies running multiple brands stop seeing every account in every brand.",
+      },
+      {
+        icon: Calendar,
+        label: "One-off scheduled posts sweep",
+        body: "Posts scheduled for a specific time now reliably publish at that time via a 60-second scheduler sweep.",
+      },
+    ],
+  },
+  {
+    date: "2026-05-12",
+    title: "Meta + LinkedIn OAuth, image generation",
+    tags: ["feature"],
+    highlights: [
+      {
+        icon: MessageSquare,
+        label: "Unified Meta OAuth",
+        body: "One flow connects Facebook Pages and Instagram Business together — using Meta's combined modern auth, not the deprecated separate flows.",
+      },
+      {
+        icon: Sparkles,
+        label: "AI image generation",
+        body: "Generate platform-appropriate images alongside captions, tuned to your brand colors when available.",
+      },
+    ],
+  },
+];
+
+export default function ChangelogPage() {
+  return (
+    <MarketingShell>
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"
+        />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-card border border-border text-primary text-xs font-medium px-3 py-1.5 rounded-full mb-5 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            Updated weekly
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight leading-tight mb-3">
+            Changelog
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            New features, improvements, and fixes. We ship every week — usually more often.
+          </p>
+        </div>
+      </section>
+
+      {/* Timeline */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="space-y-10">
+          {ENTRIES.map((entry, idx) => (
+            <article
+              key={entry.date + idx}
+              className="relative pl-7 sm:pl-10 border-l-2 border-border"
+            >
+              {/* Date dot */}
+              <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
+              <time className="block text-xs text-muted-foreground font-mono mb-1">
+                {new Date(entry.date).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </time>
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight mb-2">
+                {entry.title}
+              </h2>
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {entry.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${TAG_STYLES[tag]}`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {entry.highlights.map((h) => (
+                  <div
+                    key={h.label}
+                    className="bg-card border border-border rounded-xl p-4 flex items-start gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <h.icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground text-sm mb-0.5">{h.label}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{h.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {entry.whatsNext && (
+                <p className="text-xs text-muted-foreground mt-4 italic">
+                  → {entry.whatsNext}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="relative bg-gradient-to-br from-primary via-blue-600 to-indigo-600 rounded-3xl px-8 py-12 text-center overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent_50%),radial-gradient(circle_at_70%_80%,white,transparent_50%)]"
+          />
+          <div className="relative">
+            <h2 className="text-2xl sm:text-3xl font-bold text-primary-foreground mb-3 tracking-tight">
+              See it for yourself.
+            </h2>
+            <p className="text-primary-foreground/85 mb-7 max-w-lg mx-auto text-sm">
+              Start 7-day free trial for 7 days. All the features above, instantly.
+            </p>
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90 transition-colors shadow-md"
+            >
+              Start free trial
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    </MarketingShell>
+  );
+}

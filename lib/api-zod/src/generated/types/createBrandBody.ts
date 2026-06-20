@@ -6,14 +6,38 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreateBrandBodyApprovalMode } from "./createBrandBodyApprovalMode";
+import type { CreateBrandBodyContentPillars } from "./createBrandBodyContentPillars";
+import type { CreateBrandBodyPlatformOverrides } from "./createBrandBodyPlatformOverrides";
 import type { CreateBrandBodyTone } from "./createBrandBodyTone";
 
 export interface CreateBrandBody {
   name: string;
   industry: string;
-  tone: CreateBrandBodyTone;
+  /** @nullable */
+  tone?: CreateBrandBodyTone;
   targetAudience: string;
   keywords: string;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: CreateBrandBodyContentPillars;
+  /** @nullable */
+  platformOverrides?: CreateBrandBodyPlatformOverrides;
   /** @nullable */
   platforms?: string[] | null;
   /** @nullable */

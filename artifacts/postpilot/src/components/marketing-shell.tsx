@@ -6,8 +6,9 @@ import { KpLogo } from "@/components/kp-logo";
 const NAV = [
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/roadmap", label: "Roadmap" },
+  { href: "/changelog", label: "Changelog" },
   { href: "/affiliate-program", label: "Affiliate" },
-  { href: "/about", label: "About" },
 ];
 
 export default function MarketingShell({ children }: { children: React.ReactNode }) {
@@ -107,7 +108,7 @@ export default function MarketingShell({ children }: { children: React.ReactNode
               <KpLogo size="sm" />
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-xs">
-              Pilot your content. Grow on autopilot. Built by ClicknKonnect for solo creators, small businesses, and the agencies who serve them.
+              The AI that learns your brand. Scheduled and learning daily. Built for serious ecommerce and DTC teams.
             </p>
           </div>
           <div>
@@ -115,8 +116,20 @@ export default function MarketingShell({ children }: { children: React.ReactNode
             <ul className="space-y-2 text-muted-foreground">
               <li><Link href="/features" className="hover:text-foreground">Features</Link></li>
               <li><Link href="/pricing" className="hover:text-foreground">Pricing</Link></li>
+              <li><Link href="/changelog" className="hover:text-foreground">Changelog</Link></li>
+              <li><Link href="/roadmap" className="hover:text-foreground">Roadmap</Link></li>
               <li><Link href="/affiliate-program" className="hover:text-foreground">Affiliate program</Link></li>
               <li><Link href="/sign-up" className="hover:text-foreground">Start free trial</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground mb-3 text-xs uppercase tracking-wide">Free tools</h4>
+            <ul className="space-y-2 text-muted-foreground">
+              <li><Link href="/tools/hashtag-generator" className="hover:text-foreground">AI hashtag generator</Link></li>
+              <li><Link href="/tools/best-time-to-post" className="hover:text-foreground">Best time to post</Link></li>
+              <li><Link href="/vs/predis-ai" className="hover:text-foreground">vs Predis.ai</Link></li>
+              <li><Link href="/vs/ocoya" className="hover:text-foreground">vs Ocoya</Link></li>
+              <li><Link href="/vs/vista-social" className="hover:text-foreground">vs Vista Social</Link></li>
             </ul>
           </div>
           <div>
@@ -137,8 +150,8 @@ export default function MarketingShell({ children }: { children: React.ReactNode
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-8 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} ClicknKonnect. All rights reserved.</p>
-          <p>Made with care for the daily-poster.</p>
+          <p>© {new Date().getFullYear()} KonnectPilot. All rights reserved.</p>
+          <p>Powered by Claude (text) + Gemini Flash (image).</p>
         </div>
       </footer>
     </div>

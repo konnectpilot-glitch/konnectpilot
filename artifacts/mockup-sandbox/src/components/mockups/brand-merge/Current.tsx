@@ -41,7 +41,7 @@ const BRANDS = [
     name: "PulseFit Studio",
     industry: "Fitness",
     tone: "inspirational",
-    platforms: ["instagram", "tiktok"],
+    platforms: ["instagram"],
     postTime: "07:00",
     active: false,
   },
@@ -52,7 +52,6 @@ function PlatformBadge({ platform }: { platform: string }) {
     facebook: { icon: <Facebook className="w-3 h-3" />, label: "Facebook", cls: "bg-blue-50 text-blue-700" },
     instagram: { icon: <Instagram className="w-3 h-3" />, label: "Instagram", cls: "bg-pink-50 text-pink-700" },
     linkedin: { icon: <Linkedin className="w-3 h-3" />, label: "LinkedIn", cls: "bg-blue-50 text-blue-800" },
-    tiktok: { icon: <span className="text-[10px] font-bold">TT</span>, label: "TikTok", cls: "bg-gray-100 text-gray-700" },
   };
   const c = map[platform];
   if (!c) return null;

@@ -245,6 +245,22 @@ export const BrandTone = {
   inspirational: "inspirational",
 } as const;
 
+/**
+ * @nullable
+ */
+export type BrandContentPillars = {
+  educate?: number;
+  spotlight?: number;
+  reviews?: number;
+  bts?: number;
+  promo?: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type BrandPlatformOverrides = { [key: string]: string } | null;
+
 export type BrandApprovalMode =
   (typeof BrandApprovalMode)[keyof typeof BrandApprovalMode];
 
@@ -261,6 +277,27 @@ export interface Brand {
   tone: BrandTone;
   targetAudience: string;
   keywords: string;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: BrandContentPillars;
+  /** @nullable */
+  platformOverrides?: BrandPlatformOverrides;
   platforms: string[];
   postTime: string;
   active: boolean;
@@ -271,8 +308,12 @@ export interface Brand {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
 export type CreateBrandBodyTone =
-  (typeof CreateBrandBodyTone)[keyof typeof CreateBrandBodyTone];
+  | (typeof CreateBrandBodyTone)[keyof typeof CreateBrandBodyTone]
+  | null;
 
 export const CreateBrandBodyTone = {
   friendly: "friendly",
@@ -280,6 +321,22 @@ export const CreateBrandBodyTone = {
   fun: "fun",
   inspirational: "inspirational",
 } as const;
+
+/**
+ * @nullable
+ */
+export type CreateBrandBodyContentPillars = {
+  educate?: number;
+  spotlight?: number;
+  reviews?: number;
+  bts?: number;
+  promo?: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type CreateBrandBodyPlatformOverrides = { [key: string]: string } | null;
 
 /**
  * @nullable
@@ -296,9 +353,31 @@ export const CreateBrandBodyApprovalMode = {
 export interface CreateBrandBody {
   name: string;
   industry: string;
-  tone: CreateBrandBodyTone;
+  /** @nullable */
+  tone?: CreateBrandBodyTone;
   targetAudience: string;
   keywords: string;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: CreateBrandBodyContentPillars;
+  /** @nullable */
+  platformOverrides?: CreateBrandBodyPlatformOverrides;
   /** @nullable */
   platforms?: string[] | null;
   /** @nullable */
@@ -308,6 +387,22 @@ export interface CreateBrandBody {
   /** @nullable */
   autoGenerateEnabled?: boolean | null;
 }
+
+/**
+ * @nullable
+ */
+export type UpdateBrandBodyContentPillars = {
+  educate?: number;
+  spotlight?: number;
+  reviews?: number;
+  bts?: number;
+  promo?: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type UpdateBrandBodyPlatformOverrides = { [key: string]: string } | null;
 
 /**
  * @nullable
@@ -332,6 +427,27 @@ export interface UpdateBrandBody {
   targetAudience?: string | null;
   /** @nullable */
   keywords?: string | null;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: UpdateBrandBodyContentPillars;
+  /** @nullable */
+  platformOverrides?: UpdateBrandBodyPlatformOverrides;
   /** @nullable */
   platforms?: string[] | null;
   /** @nullable */
@@ -398,7 +514,6 @@ export const GeneratePostBodyPlatform = {
   facebook: "facebook",
   instagram: "instagram",
   linkedin: "linkedin",
-  tiktok: "tiktok",
 } as const;
 
 export interface GeneratePostBody {

@@ -6,8 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * @nullable
+ */
 export type CreateBrandBodyTone =
-  (typeof CreateBrandBodyTone)[keyof typeof CreateBrandBodyTone];
+  | (typeof CreateBrandBodyTone)[keyof typeof CreateBrandBodyTone]
+  | null;
 
 export const CreateBrandBodyTone = {
   friendly: "friendly",

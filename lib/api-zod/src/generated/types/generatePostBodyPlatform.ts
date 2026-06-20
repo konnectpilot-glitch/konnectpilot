@@ -13,5 +13,4 @@ export const GeneratePostBodyPlatform = {
   facebook: "facebook",
   instagram: "instagram",
   linkedin: "linkedin",
-  tiktok: "tiktok",
 } as const;

@@ -32,7 +32,6 @@ function buildCaptionPrompt(brand: any, platform: string, topic: string | null, 
     instagram: "Write an engaging Instagram caption with 3-5 relevant hashtags. Max 200 words.",
     facebook: "Write a conversational Facebook post ending with an engaging question. Max 150 words.",
     linkedin: "Write a professional LinkedIn post with max 3 hashtags. Share insights. Max 200 words.",
-    tiktok: "Write a very short, punchy TikTok caption. Casual tone, max 50 words.",
   };
   return `You are a social media content writer for ${brand.name}, a ${brand.industry} business.
 
@@ -243,6 +242,16 @@ router.patch("/approval/posts/:id", requireAuth, requireWorkspace, async (req: a
       updates.scheduledFor = when;
     } else {
       updates.scheduledFor = null;
+    }
+  }
+  // status flip used by the Generate page's "Schedule" CTA — flipping a draft
+  // to "scheduled" makes the one-off-post sweep in scheduler.ts pick it up
+  // when scheduledFor arrives. Only allow transitions between generated/
+  // scheduled here; publish/approval transitions still go through their
+  // dedicated endpoints.
+  if (body.data.status === "scheduled" || body.data.status === "generated") {
+    if (existing.status === "generated" || existing.status === "scheduled") {
+      updates.status = body.data.status;
     }
   }
 

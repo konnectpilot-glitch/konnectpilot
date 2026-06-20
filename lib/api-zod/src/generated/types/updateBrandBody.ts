@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { UpdateBrandBodyApprovalMode } from "./updateBrandBodyApprovalMode";
+import type { UpdateBrandBodyContentPillars } from "./updateBrandBodyContentPillars";
+import type { UpdateBrandBodyPlatformOverrides } from "./updateBrandBodyPlatformOverrides";
 
 export interface UpdateBrandBody {
   /** @nullable */
@@ -18,6 +20,27 @@ export interface UpdateBrandBody {
   targetAudience?: string | null;
   /** @nullable */
   keywords?: string | null;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: UpdateBrandBodyContentPillars;
+  /** @nullable */
+  platformOverrides?: UpdateBrandBodyPlatformOverrides;
   /** @nullable */
   platforms?: string[] | null;
   /** @nullable */

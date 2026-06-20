@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BrandApprovalMode } from "./brandApprovalMode";
+import type { BrandContentPillars } from "./brandContentPillars";
+import type { BrandPlatformOverrides } from "./brandPlatformOverrides";
 import type { BrandTone } from "./brandTone";
 
 export interface Brand {
@@ -16,6 +18,27 @@ export interface Brand {
   tone: BrandTone;
   targetAudience: string;
   keywords: string;
+  /** @nullable */
+  voiceDescription?: string | null;
+  /** @nullable */
+  examplePosts?: string | null;
+  /** @nullable */
+  doDontRules?: string | null;
+  /**
+   * @maxItems 3
+   * @nullable
+   */
+  logos?: string[] | null;
+  /** @nullable */
+  websiteUrl?: string | null;
+  /** @nullable */
+  brandColorPrimary?: string | null;
+  /** @nullable */
+  brandColorSecondary?: string | null;
+  /** @nullable */
+  contentPillars?: BrandContentPillars;
+  /** @nullable */
+  platformOverrides?: BrandPlatformOverrides;
   platforms: string[];
   postTime: string;
   active: boolean;

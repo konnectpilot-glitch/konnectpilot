@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
-import { createHmac, timingSafeEqual } from "crypto";
-import { db, socialAccountsTable, usersTable } from "@workspace/db";
+import { eq, and, lt } from "drizzle-orm";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { db, socialAccountsTable, usersTable, oauthStagingTable } from "@workspace/db";
 import { requireAuth, requireWorkspace, ensureUser, hasRoleAtLeast } from "./users";
 import { workspacesTable, workspaceMembersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -84,12 +84,30 @@ type PlatformConfig = {
   }>;
 };
 
+// Unified Meta OAuth scope — single consent screen covers both FB Pages and
+// IG Business. After the callback, user picks which Pages to import via the
+// staging/picker flow; for each selected Page we probe for a linked IG
+// Business account and import that too.
+const META_SCOPE = [
+  "public_profile",
+  "business_management",
+  "pages_show_list",
+  "pages_manage_posts",
+  "pages_read_engagement",
+  "instagram_basic",
+  "instagram_content_publish",
+  "instagram_manage_insights",
+].join(",");
+
 const PLATFORMS: Record<string, PlatformConfig> = {
-  facebook: {
-    envKeys: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
-    scope: "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content",
+  meta: {
+    envKeys: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "FACEBOOK_REDIRECT_URI"],
+    scope: META_SCOPE,
     authUrl: (redirectUri, state) =>
-      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata,pages_read_user_content")}&response_type=code&state=${state}`,
+      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent(META_SCOPE)}` +
+      `&response_type=code&state=${state}`,
     exchangeToken: async (code, redirectUri) => {
       const params = new URLSearchParams({
         client_id: process.env.FACEBOOK_APP_ID!,
@@ -98,68 +116,18 @@ const PLATFORMS: Record<string, PlatformConfig> = {
         code,
       });
       const res = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
-      if (!res.ok) throw new Error(`Facebook token exchange failed: ${await res.text()}`);
+      if (!res.ok) throw new Error(`Meta token exchange failed: ${await res.text()}`);
       const data = (await res.json()) as { access_token: string; expires_in?: number };
       return {
         accessToken: data.access_token,
         expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined,
       };
     },
-    fetchProfile: async (accessToken) => {
-      const res = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${accessToken}`);
-      if (!res.ok) throw new Error(`Facebook profile fetch failed: ${await res.text()}`);
-      const data = (await res.json()) as { id: string; name: string };
-      return {
-        platformUserId: data.id,
-        accountName: data.name,
-        profilePictureUrl: `https://graph.facebook.com/v19.0/${data.id}/picture?type=normal`,
-      };
-    },
-  },
-  instagram: {
-    envKeys: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
-    scope: "public_profile,pages_show_list,instagram_basic,instagram_content_publish,instagram_manage_insights",
-    authUrl: (redirectUri, state) =>
-      `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("public_profile,pages_show_list,instagram_basic,instagram_content_publish,instagram_manage_insights")}&response_type=code&state=${state}`,
-    exchangeToken: async (code, redirectUri) => {
-      const params = new URLSearchParams({
-        client_id: process.env.FACEBOOK_APP_ID!,
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
-        redirect_uri: redirectUri,
-        code,
-      });
-      const res = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
-      if (!res.ok) throw new Error(`Instagram token exchange failed: ${await res.text()}`);
-      const data = (await res.json()) as { access_token: string; expires_in?: number };
-      return {
-        accessToken: data.access_token,
-        expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined,
-      };
-    },
-    fetchProfile: async (accessToken) => {
-      // Get user's Pages, then the IG business account on each page
-      const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`);
-      if (!pagesRes.ok) throw new Error(`Instagram pages fetch failed: ${await pagesRes.text()}`);
-      const pagesData = (await pagesRes.json()) as { data: { id: string; name: string }[] };
-      for (const page of pagesData.data) {
-        const igRes = await fetch(
-          `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`,
-        );
-        if (!igRes.ok) continue;
-        const igData = (await igRes.json()) as {
-          instagram_business_account?: { id: string; username: string; name: string; profile_picture_url?: string };
-        };
-        if (igData.instagram_business_account) {
-          const ig = igData.instagram_business_account;
-          return {
-            platformUserId: ig.id,
-            accountName: ig.name || ig.username,
-            accountHandle: ig.username ? `@${ig.username}` : null,
-            profilePictureUrl: ig.profile_picture_url ?? null,
-          };
-        }
-      }
-      throw new Error("No Instagram Business account found. Connect a Facebook Page that's linked to an Instagram Business account.");
+    // No fetchProfile for meta — the callback stages a picker flow instead.
+    // This field is required by the type, so we point it at a no-op that's
+    // never invoked for meta (callback handler branches on platform === "meta").
+    fetchProfile: async () => {
+      throw new Error("Meta uses the staging/picker flow; fetchProfile not used.");
     },
   },
   linkedin: {
@@ -202,55 +170,6 @@ const PLATFORMS: Record<string, PlatformConfig> = {
       };
     },
   },
-  tiktok: {
-    envKeys: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],
-    scope: "user.info.basic,video.publish,video.upload",
-    authUrl: (redirectUri, state) =>
-      `https://www.tiktok.com/v2/auth/authorize?client_key=${process.env.TIKTOK_CLIENT_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("user.info.basic,video.publish,video.upload")}&response_type=code&state=${state}`,
-    exchangeToken: async (code, redirectUri) => {
-      const body = new URLSearchParams({
-        client_key: process.env.TIKTOK_CLIENT_KEY!,
-        client_secret: process.env.TIKTOK_CLIENT_SECRET!,
-        code,
-        grant_type: "authorization_code",
-        redirect_uri: redirectUri,
-      });
-      const res = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body,
-      });
-      if (!res.ok) throw new Error(`TikTok token exchange failed: ${await res.text()}`);
-      const data = (await res.json()) as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-      return {
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined,
-      };
-    },
-    fetchProfile: async (accessToken) => {
-      const res = await fetch(
-        "https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name,username",
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (!res.ok) throw new Error(`TikTok profile fetch failed: ${await res.text()}`);
-      const data = (await res.json()) as {
-        data?: { user?: { open_id: string; display_name: string; username?: string; avatar_url?: string } };
-      };
-      const user = data.data?.user;
-      if (!user) throw new Error("TikTok profile missing user data");
-      return {
-        platformUserId: user.open_id,
-        accountName: user.display_name,
-        accountHandle: user.username ? `@${user.username}` : null,
-        profilePictureUrl: user.avatar_url ?? null,
-      };
-    },
-  },
 };
 
 function getAppUrl(req: any): string {
@@ -258,7 +177,30 @@ function getAppUrl(req: any): string {
 }
 
 function getRedirectUri(req: any, platform: string): string {
+  // Meta requires an exact match against the URI registered in the App
+  // settings. We honor a dedicated env var (FACEBOOK_REDIRECT_URI) for that
+  // platform so the registered URI can differ from APP_URL (which is the
+  // frontend's URL). Other providers derive from APP_URL as before.
+  if (platform === "meta" && process.env.FACEBOOK_REDIRECT_URI) {
+    return process.env.FACEBOOK_REDIRECT_URI;
+  }
   return `${getAppUrl(req)}/api/social-accounts/callback/${platform}`;
+}
+
+// Random URL-safe ticket for the staging row. Long enough to be unguessable;
+// stored in a unique-indexed column to make collision irrelevant.
+function newTicket(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+// Lazy sweep of expired staging rows. Called on staging-related requests so
+// we don't grow forever without a dedicated cron. Cheap query (single DELETE).
+async function sweepExpiredStaging(): Promise<void> {
+  try {
+    await db.delete(oauthStagingTable).where(lt(oauthStagingTable.expiresAt, new Date()));
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "oauth_staging sweep failed");
+  }
 }
 
 async function connectHandler(req: any, res: any): Promise<void> {
@@ -288,9 +230,11 @@ async function connectHandlerImpl(req: any, res: any): Promise<void> {
 }
 
 router.get("/social-accounts/callback/:platform", async (req, res): Promise<void> => {
-  const platform = req.params.platform;
+  // URL path uses "facebook" (registered redirect URI) but internal config key is "meta"
+  const rawPlatform = req.params.platform;
+  const platform = rawPlatform === "facebook" ? "meta" : rawPlatform;
   const config = PLATFORMS[platform];
-  const redirectBase = "/accounts";
+  const redirectBase = `${getAppUrl(req)}/accounts`;
 
   if (!config) {
     res.redirect(`${redirectBase}?error=invalid_platform`);
@@ -344,6 +288,92 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
 
     const redirectUri = getRedirectUri(req, platform);
     const tokens = await config.exchangeToken(code, redirectUri);
+
+    // Meta: stage the result and bounce to the picker UI.
+    if (platform === "meta") {
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts` +
+          `?fields=id,name,access_token,picture` +
+          `&access_token=${encodeURIComponent(tokens.accessToken)}`,
+      );
+      if (!pagesRes.ok) {
+        logger.error({ body: await pagesRes.text() }, "Meta /me/accounts failed");
+        res.redirect(`${redirectBase}?error=callback_failed&platform=meta`);
+        return;
+      }
+      const { data: pages = [] } = (await pagesRes.json()) as {
+        data?: Array<{
+          id: string;
+          name: string;
+          access_token: string;
+          picture?: { data?: { url?: string } };
+        }>;
+      };
+
+      // For each Page, probe whether it has a linked IG Business account.
+      // Use the Page token (not the user token) — Meta requires it for this field.
+      const enriched = await Promise.all(
+        pages.map(async (p) => {
+          let igAccount: {
+            id: string;
+            username: string;
+            name?: string;
+            profilePictureUrl?: string | null;
+          } | null = null;
+          try {
+            const igRes = await fetch(
+              `https://graph.facebook.com/v19.0/${p.id}` +
+                `?fields=instagram_business_account{id,username,name,profile_picture_url}` +
+                `&access_token=${encodeURIComponent(p.access_token)}`,
+            );
+            if (igRes.ok) {
+              const igData = (await igRes.json()) as {
+                instagram_business_account?: {
+                  id: string;
+                  username: string;
+                  name?: string;
+                  profile_picture_url?: string;
+                };
+              };
+              if (igData.instagram_business_account) {
+                igAccount = {
+                  id: igData.instagram_business_account.id,
+                  username: igData.instagram_business_account.username,
+                  name: igData.instagram_business_account.name,
+                  profilePictureUrl: igData.instagram_business_account.profile_picture_url ?? null,
+                };
+              }
+            }
+          } catch (err: any) {
+            logger.warn({ err: err?.message, pageId: p.id }, "IG linkage probe failed");
+          }
+          return {
+            pageId: p.id,
+            pageName: p.name,
+            pageAccessToken: p.access_token,
+            pagePictureUrl: p.picture?.data?.url ?? null,
+            igAccount,
+          };
+        }),
+      );
+
+      const ticket = newTicket();
+      await db.insert(oauthStagingTable).values({
+        ticket,
+        userId: user.id,
+        workspaceId: targetWsId,
+        provider: "meta",
+        userAccessToken: tokens.accessToken,
+        tokenExpiresAt: tokens.expiresAt ?? null,
+        fetchedPages: { pages: enriched },
+        expiresAt: new Date(Date.now() + 5 * 60_000),
+      });
+
+      res.redirect(`${getAppUrl(req)}/accounts/connect/meta?ticket=${ticket}`);
+      return;
+    }
+
+    // Single-account providers (LinkedIn): existing insert-on-callback flow.
     const profile = await config.fetchProfile(tokens.accessToken);
 
     // Upsert by (workspaceId, platform, platformUserId) — falls back to user-scoped match
@@ -386,6 +416,7 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
         userId: user.id,
         workspaceId: targetWsId,
         platform,
+        accountType: platform === "linkedin" ? "linkedin_person" : null,
         platformUserId: profile.platformUserId,
         accountName: profile.accountName,
         accountHandle: profile.accountHandle ?? null,
@@ -403,6 +434,206 @@ router.get("/social-accounts/callback/:platform", async (req, res): Promise<void
     res.redirect(`${redirectBase}?error=callback_failed&platform=${platform}`);
   }
 });
+
+// Read the Pages snapshot for a staging ticket so the picker UI can render
+// without re-querying Meta. Ticket must belong to the calling user.
+router.get(
+  "/social-accounts/staging/:ticket",
+  requireAuth,
+  requireWorkspace,
+  async (req: any, res): Promise<void> => {
+    await sweepExpiredStaging();
+    const ticket = String(req.params.ticket);
+    const [row] = await db
+      .select()
+      .from(oauthStagingTable)
+      .where(eq(oauthStagingTable.ticket, ticket));
+    if (!row || row.userId !== req.user.id) {
+      res.status(404).json({ error: "Staging ticket not found or expired" });
+      return;
+    }
+    if (row.expiresAt < new Date()) {
+      res.status(410).json({ error: "Staging ticket expired — restart the OAuth flow" });
+      return;
+    }
+    const fetched = (row.fetchedPages as any) ?? { pages: [] };
+    // Strip page access tokens from the response — they never go to the browser.
+    const pages = (fetched.pages ?? []).map((p: any) => ({
+      pageId: p.pageId,
+      pageName: p.pageName,
+      pagePictureUrl: p.pagePictureUrl,
+      igAccount: p.igAccount
+        ? {
+            id: p.igAccount.id,
+            username: p.igAccount.username,
+            name: p.igAccount.name,
+            profilePictureUrl: p.igAccount.profilePictureUrl,
+          }
+        : null,
+    }));
+    res.json({ provider: row.provider, pages });
+  },
+);
+
+// Apply the user's Page selection. Creates one social_accounts row per
+// selected Page (account_type = facebook_page), plus one per linked IG when
+// includeLinkedInstagram is true (account_type = instagram_business). Deletes
+// the staging row on success; partial failures (e.g. quota cap) are reported.
+router.post(
+  "/social-accounts/staging/:ticket/select",
+  requireAuth,
+  requireWorkspace,
+  async (req: any, res): Promise<void> => {
+    if (!hasRoleAtLeast(req.workspaceRole, "admin")) {
+      res.status(403).json({ error: "Admin role required" });
+      return;
+    }
+    await sweepExpiredStaging();
+    const ticket = String(req.params.ticket);
+    const [row] = await db
+      .select()
+      .from(oauthStagingTable)
+      .where(eq(oauthStagingTable.ticket, ticket));
+    if (!row || row.userId !== req.user.id) {
+      res.status(404).json({ error: "Staging ticket not found or expired" });
+      return;
+    }
+    if (row.expiresAt < new Date()) {
+      res.status(410).json({ error: "Staging ticket expired — restart the OAuth flow" });
+      return;
+    }
+
+    const body = req.body ?? {};
+    const pageIds = Array.isArray(body.pageIds) ? body.pageIds.map(String) : [];
+    const includeLinkedInstagram = body.includeLinkedInstagram !== false;
+    if (pageIds.length === 0) {
+      res.status(400).json({ error: "Pick at least one Page" });
+      return;
+    }
+
+    const fetched = (row.fetchedPages as any) ?? { pages: [] };
+    const selected = (fetched.pages ?? []).filter((p: any) => pageIds.includes(p.pageId));
+    if (selected.length === 0) {
+      res.status(400).json({ error: "Selected Page IDs do not match the staged set" });
+      return;
+    }
+
+    // Build the rows we want to insert; check quota against the projected total.
+    const wantedRows: Array<{
+      platform: string;
+      accountType: string;
+      platformUserId: string;
+      accountName: string;
+      accountHandle: string | null;
+      profilePictureUrl: string | null;
+      accessToken: string;
+      tokenExpiresAt: Date | null;
+      platformMetadata: Record<string, unknown>;
+    }> = [];
+    for (const p of selected) {
+      wantedRows.push({
+        platform: "facebook",
+        accountType: "facebook_page",
+        platformUserId: p.pageId,
+        accountName: p.pageName,
+        accountHandle: null,
+        profilePictureUrl: p.pagePictureUrl ?? null,
+        accessToken: p.pageAccessToken,
+        tokenExpiresAt: row.tokenExpiresAt,
+        platformMetadata: { pictureUrl: p.pagePictureUrl ?? null },
+      });
+      if (includeLinkedInstagram && p.igAccount) {
+        wantedRows.push({
+          platform: "instagram",
+          accountType: "instagram_business",
+          platformUserId: p.igAccount.id,
+          accountName: p.igAccount.name || p.igAccount.username,
+          // Store handle without the leading @ — the UI prefixes it on render.
+          accountHandle: p.igAccount.username || null,
+          profilePictureUrl: p.igAccount.profilePictureUrl ?? null,
+          // IG publishing uses the parent Page's token — store it directly so
+          // the publisher doesn't need to look up the linked Page row.
+          accessToken: p.pageAccessToken,
+          tokenExpiresAt: row.tokenExpiresAt,
+          platformMetadata: {
+            linkedPageId: p.pageId,
+            linkedPageName: p.pageName,
+            igUsername: p.igAccount.username,
+          },
+        });
+      }
+    }
+
+    // Cap check: existing + would-be insertions.
+    const cap = await assertSocialAccountQuotaForCallback(req.user.id, req.user.plan, req.workspaceId);
+    const existingCount = getPlan(req.user.plan).socialAccounts - (cap.limit - (cap.ok ? 1 : 0)); // rough; recount cleanly:
+    const existing = await db
+      .select({ id: socialAccountsTable.id })
+      .from(socialAccountsTable)
+      .where(eq(socialAccountsTable.workspaceId, req.workspaceId));
+    if (existing.length + wantedRows.length > cap.limit) {
+      res.status(403).json({
+        error: `Selection would exceed your plan limit (${existing.length + wantedRows.length} > ${cap.limit}).`,
+        code: "social_account_limit_reached",
+      });
+      return;
+    }
+    void existingCount; // shadowed by clean recount above; keep for clarity.
+
+    // Upsert each row by (workspaceId, platform, platformUserId).
+    const created: Array<{ id: number; platform: string; accountType: string; accountName: string }> = [];
+    for (const r of wantedRows) {
+      const [dupe] = await db
+        .select()
+        .from(socialAccountsTable)
+        .where(
+          and(
+            eq(socialAccountsTable.workspaceId, req.workspaceId),
+            eq(socialAccountsTable.platform, r.platform),
+            eq(socialAccountsTable.platformUserId, r.platformUserId),
+          ),
+        );
+      if (dupe) {
+        await db
+          .update(socialAccountsTable)
+          .set({
+            accountType: r.accountType,
+            accountName: r.accountName,
+            accountHandle: r.accountHandle,
+            profilePictureUrl: r.profilePictureUrl,
+            accessToken: r.accessToken,
+            tokenExpiresAt: r.tokenExpiresAt,
+            platformMetadata: r.platformMetadata,
+            isActive: true,
+          })
+          .where(eq(socialAccountsTable.id, dupe.id));
+        created.push({ id: dupe.id, platform: r.platform, accountType: r.accountType, accountName: r.accountName });
+      } else {
+        const [ins] = await db
+          .insert(socialAccountsTable)
+          .values({
+            userId: req.user.id,
+            workspaceId: req.workspaceId,
+            platform: r.platform,
+            accountType: r.accountType,
+            platformUserId: r.platformUserId,
+            accountName: r.accountName,
+            accountHandle: r.accountHandle,
+            profilePictureUrl: r.profilePictureUrl,
+            accessToken: r.accessToken,
+            tokenExpiresAt: r.tokenExpiresAt,
+            platformMetadata: r.platformMetadata,
+            isActive: true,
+          })
+          .returning({ id: socialAccountsTable.id });
+        created.push({ id: ins.id, platform: r.platform, accountType: r.accountType, accountName: r.accountName });
+      }
+    }
+
+    await db.delete(oauthStagingTable).where(eq(oauthStagingTable.id, row.id));
+    res.json({ created });
+  },
+);
 
 router.post("/social-accounts/manual-connect", requireAuth, requireWorkspace, async (req: any, res): Promise<void> => {
   if (!hasRoleAtLeast(req.workspaceRole, "admin")) {

@@ -9,11 +9,14 @@ import { useAuth } from "@clerk/react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   FileText, Trash2, Copy, Check, Facebook, Instagram, Linkedin, Search, RotateCcw,
-  Loader2, MessageSquare, Send, ThumbsUp, ThumbsDown,
+  Loader2, MessageSquare, Send, ThumbsUp, ThumbsDown, Star,
 } from "lucide-react";
-import { FaTiktok } from "react-icons/fa";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/friendly-error";
 import { formatDistanceToNow, format } from "date-fns";
+import EmptyState from "@/components/empty-state";
+import { Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import PostCommentsPanel from "@/components/post-comments-panel";
 import { useWorkspace, hasRoleAtLeast } from "@/lib/workspaceContext";
 
@@ -21,7 +24,6 @@ function PlatformIcon({ platform }: { platform: string }) {
   if (platform === "facebook") return <Facebook className="w-4 h-4 text-blue-600" />;
   if (platform === "instagram") return <Instagram className="w-4 h-4 text-pink-600" />;
   if (platform === "linkedin") return <Linkedin className="w-4 h-4 text-blue-700" />;
-  if (platform === "tiktok") return <FaTiktok className="w-3.5 h-3.5 text-foreground" />;
   return null;
 }
 
@@ -76,6 +78,29 @@ export default function PostsPage() {
     });
   }
 
+  // Promote a post's content to a brand-voice example. Compounds the AI
+  // moat — every promoted example sharpens future caption generations for
+  // that brand. Capped + deduped server-side, so spamming the button is safe.
+  const promoteToExample = useMutation({
+    mutationFn: async ({ brandId, content }: { brandId: number; content: string }) => {
+      const res = await authedFetch(`/api/brands/${brandId}/examples/promote`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Couldn't save example");
+      return body as { promoted?: boolean; already?: boolean; count: number };
+    },
+    onSuccess: (r) => {
+      if (r.already) {
+        toast.success("Already saved — the AI is already using this as a voice anchor");
+      } else {
+        toast.success(`Saved as voice example — ${r.count} now anchoring this brand's drafts`);
+      }
+    },
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't save the voice example. Please try again.")),
+  });
+
   const retryPost = useMutation({
     mutationFn: async (id: number) => {
       const res = await authedFetch(`/api/posts/${id}/retry`, { method: "POST" });
@@ -87,7 +112,7 @@ export default function PostsPage() {
       queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
       toast.success("Post published");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't retry that post. Please try again.")),
   });
 
   const submitPost = useMutation({
@@ -101,7 +126,7 @@ export default function PostsPage() {
       queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
       toast.success("Submitted for approval");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Submit failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't submit for approval. Please try again.")),
   });
 
   const approvePost = useMutation({
@@ -118,7 +143,7 @@ export default function PostsPage() {
       queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
       toast.success(vars.publish ? "Approved & published" : "Approved");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Approve failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't approve that post. Please try again.")),
   });
 
   const rejectPost = useMutation({
@@ -135,7 +160,7 @@ export default function PostsPage() {
       queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
       toast.success("Post rejected");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Reject failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't reject that post. Please try again.")),
   });
 
   const filtered = posts?.filter(p =>
@@ -168,7 +193,7 @@ export default function PostsPage() {
 
   return (
     <Layout>
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Post History</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -201,7 +226,6 @@ export default function PostsPage() {
             <option value="facebook">Facebook</option>
             <option value="instagram">Instagram</option>
             <option value="linkedin">LinkedIn</option>
-            <option value="tiktok">TikTok</option>
           </select>
           <select
             value={statusFilter}
@@ -229,16 +253,21 @@ export default function PostsPage() {
             ))}
           </div>
         ) : (filtered?.length ?? 0) === 0 ? (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
-            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-6 h-6 text-muted-foreground/40" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">No posts found</h2>
-            <p className="text-sm text-muted-foreground">
-              {search || platformFilter !== "all" || statusFilter !== "all"
-                ? "Try adjusting your filters"
-                : "Generate your first post to see it here"}
-            </p>
+          <div className="bg-card border border-border rounded-xl">
+            <EmptyState
+              icon={FileText}
+              title={search || platformFilter !== "all" || statusFilter !== "all" ? "No matching posts" : "No posts yet"}
+              description={
+                search || platformFilter !== "all" || statusFilter !== "all"
+                  ? "Nothing matches the current filters. Try clearing them or widening your search."
+                  : "Every post you generate, schedule, or publish shows up here with full history and analytics."
+              }
+              primaryCta={
+                !(search || platformFilter !== "all" || statusFilter !== "all")
+                  ? { label: "Generate your first post", href: "/generate", icon: Sparkles }
+                  : undefined
+              }
+            />
           </div>
         ) : (
           <div className="space-y-3">
@@ -300,6 +329,25 @@ export default function PostsPage() {
                       >
                         <MessageSquare className="w-4 h-4 text-muted-foreground" />
                       </button>
+                      {/* Save as voice example — only meaningful for posts
+                          that actually got published or approved (i.e.
+                          things the user judged good enough to go live). */}
+                      {/* "published" doesn't appear in the status enum yet
+                          but is the value persisted server-side after a
+                          successful publish — widen the comparison via `as`
+                          rather than narrow the union. */}
+                      {((post.status as string) === "published") && canEdit && (
+                        <button
+                          onClick={() => promoteToExample.mutate({ brandId: post.brandId, content: post.content })}
+                          disabled={promoteToExample.isPending}
+                          className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+                          title="Save this post as a brand voice example — sharpens future AI drafts"
+                        >
+                          {promoteToExample.isPending && (promoteToExample.variables as any)?.brandId === post.brandId && (promoteToExample.variables as any)?.content === post.content
+                            ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+                            : <Star className="w-4 h-4 text-muted-foreground" />}
+                        </button>
+                      )}
                       {post.status === "failed" && canEdit && (
                         <button
                           onClick={() => retryPost.mutate(post.id)}

@@ -4,12 +4,25 @@ import {
   postingSchedulesTable,
   brandsTable,
   socialAccountsTable,
+  brandSocialAccountsTable,
   postsTable,
   workspacesTable,
 } from "@workspace/db";
 import { generateClaudeText, generateNanoBananaImage } from "./ai-providers";
 import { logger } from "./logger";
 import { publishToFacebook, publishToInstagram, publishToLinkedIn } from "./publishers";
+import { buildProfessionalImageBrief, type ImageStyle } from "./image-brief";
+import { writeImageHook } from "./hook-writer";
+import { bakeImageOverlays } from "./image-overlay";
+import { buildCaptionBrief, type Platform as CaptionPlatform } from "./caption-brief";
+
+const VALID_STYLES: ImageStyle[] = [
+  "auto", "product_hero", "lifestyle", "editorial", "minimalist_studio", "documentary", "flat_lay",
+];
+function normalizeStyle(raw: string | null | undefined): ImageStyle {
+  if (!raw) return "auto";
+  return (VALID_STYLES as string[]).includes(raw) ? (raw as ImageStyle) : "auto";
+}
 
 const TICK_MS = 60_000;
 const SLOT_TOLERANCE_MS = 5 * 60_000;
@@ -74,35 +87,86 @@ function utcSlotForLocalTime(now: Date, hh: number, mm: number, tz: string): Dat
   }
 }
 
-function buildCaption(brand: any, platform: string, prompt?: string | null): string {
-  const platformInstructions: Record<string, string> = {
-    instagram: "Write an engaging Instagram caption with 3-5 relevant hashtags. Max 200 words.",
-    facebook: "Write a conversational Facebook post ending with an engaging question. Max 150 words.",
-    linkedin: "Write a professional LinkedIn post with max 3 hashtags. Share insights. Max 200 words.",
-  };
-  const topicLine = prompt
-    ? `Today's topic: ${prompt}`
-    : "Choose a relevant topic based on the brand's industry and keywords.";
-  return `You are a social media content writer for ${brand.name}, a ${brand.industry} business.
-
-Brand details:
-- Tone of voice: ${brand.tone}
-- Target audience: ${brand.targetAudience}
-- Keywords: ${brand.keywords}
-
-Platform: ${platform}
-${topicLine}
-
-Instructions: ${platformInstructions[platform] ?? "Write a social media post."}
-
-Write ONLY the post content. No preamble, no explanations.`;
+// Phase 2: weighted-random pillar pick. Used by the scheduler so a brand's
+// configured content mix actually drives what gets generated. Falls back to a
+// neutral "general" if no pillars are configured.
+const PILLAR_GUIDANCE: Record<string, string> = {
+  educate: "Write an educational tip or how-to relevant to the brand's industry.",
+  spotlight: "Spotlight a product or service from the brand. Highlight one specific benefit.",
+  reviews: "Frame this as a customer story or testimonial pattern. Use plain, real-feeling language.",
+  bts: "Behind-the-scenes — process, team, packaging, or the day-to-day of running the brand.",
+  promo: "Promote a current offer or call out a specific reason to buy now. Stay on-brand, not salesy.",
+};
+function pickPillar(pillars: any): string | null {
+  if (!pillars || typeof pillars !== "object") return null;
+  const entries = Object.entries(pillars).filter(([, v]) => Number(v) > 0);
+  if (entries.length === 0) return null;
+  const total = entries.reduce((sum, [, v]) => sum + Number(v), 0);
+  let r = Math.random() * total;
+  for (const [k, v] of entries) {
+    r -= Number(v);
+    if (r <= 0) return k;
+  }
+  return entries[0][0];
 }
 
-function buildImagePrompt(brand: any, prompt?: string | null, style?: string | null): string {
-  return `Create a visually striking professional social media image for ${brand.name}, a ${brand.industry} brand.
-Style: ${style ?? `${brand.tone} tone, appealing to ${brand.targetAudience}`}.
-${prompt ? `Theme: ${prompt}.` : ""}
-Polished, brand-appropriate, scroll-stopping. No text overlays.`;
+function buildCaption(brand: any, platform: string, prompt?: string | null): string {
+  // Pillar selection happens here (scheduler-side, weighted-random) and we
+  // pass both the pillar id and its long-form guidance through to the shared
+  // brief builder so the manual-generate path and scheduler stay aligned.
+  const pillar = pickPillar(brand.contentPillars);
+  return buildCaptionBrief({
+    brand,
+    platform: platform as CaptionPlatform,
+    topic: prompt ?? null,
+    pillar: pillar ?? null,
+    pillarGuidance: pillar ? PILLAR_GUIDANCE[pillar] ?? null : null,
+  });
+}
+
+// DEPRECATED — kept for the rare callers that still pass through, but every
+// real generation path now goes through buildProfessionalImageBrief (in
+// lib/image-brief.ts). The reason: the old prompt was too generic ("scroll-
+// stopping", "polished") and produced AI-slop output. The new brief writer
+// uses Claude as a creative director who specifies subject, lens, lighting,
+// composition, and explicit anti-AI-slop negative cues.
+async function buildImagePromptPro(
+  brand: any,
+  prompt?: string | null,
+  style?: string | null,
+  platform?: string | null,
+  postContent?: string | null,
+  hasLogoReference?: boolean,
+): Promise<string> {
+  try {
+    return await buildProfessionalImageBrief({
+      brand: {
+        name: brand.name,
+        industry: brand.industry,
+        targetAudience: brand.targetAudience,
+        voiceDescription: brand.voiceDescription,
+        tone: brand.tone,
+        keywords: brand.keywords,
+        brandColorPrimary: brand.brandColorPrimary,
+        brandColorSecondary: brand.brandColorSecondary,
+        websiteUrl: brand.websiteUrl,
+      },
+      topic: prompt ?? null,
+      platform: platform ?? null,
+      postContent: postContent ?? null,
+      hasLogoReference: !!hasLogoReference,
+      style: normalizeStyle(style),
+    });
+  } catch (err) {
+    // Enhancer failure path — same structured fallback as routes/generate.ts
+    // so scheduled posts still get a markedly-better prompt than the legacy
+    // one even if Claude is unhappy.
+    logger.warn({ err: (err as any)?.message, brandId: brand?.id }, "Scheduler image brief enhancer failed; using structured fallback");
+    const colorBlock = brand.brandColorPrimary
+      ? `Brand color palette: primary ${brand.brandColorPrimary}${brand.brandColorSecondary ? `, secondary ${brand.brandColorSecondary}` : ""}. Use these colors naturally in the scene.`
+      : "";
+    return `Professional commercial photography for ${brand.name}, a ${brand.industry} brand serving ${brand.targetAudience}. ${prompt ? `Subject: ${prompt}.` : "Subject: a versatile evergreen brand-defining moment."} Shot on 50mm f/1.8 lens with shallow depth of field, soft natural window light, rule-of-thirds composition with deliberate negative space, editorial commercial photography style. ${colorBlock} 1:1 square aspect ratio composed for ${platform ?? "social"} feed. Photorealistic, no text overlays, no watermarks, no warped hands, no extra fingers, no plastic skin texture, no AI artifacts, no logos in the image.`;
+  }
 }
 
 async function generateContent(brand: any, platform: string, contentPrompt?: string | null) {
@@ -113,8 +177,75 @@ async function generateContent(brand: any, platform: string, contentPrompt?: str
   return content;
 }
 
-async function generateImageDataUrl(prompt: string): Promise<string> {
-  const { dataUrl } = await generateNanoBananaImage(prompt, { timeoutMs: 120_000 });
+// Logo URL helper — delegates to the signed-URL builder in routes/brands.ts
+// so Nano Banana receives a short-lived HMAC token rather than an
+// enumerable raw URL.
+import { buildSignedLogoUrl } from "../routes/brands";
+const buildPublicLogoUrl = buildSignedLogoUrl;
+
+/** True iff this brand has a logo AND we can build a public URL for it
+ *  (which we can't in dev). Used to inform the enhancer whether to tell
+ *  Claude that a logo reference will be attached. */
+function hasReachableLogo(brand: any): boolean {
+  const logoCount = Array.isArray(brand?.logos) ? brand.logos.length : 0;
+  if (logoCount === 0) return false;
+  return !!buildPublicLogoUrl(brand.id, 0);
+}
+
+async function generateImageDataUrl(
+  prompt: string,
+  brand?: any,
+  overlay?: { caption?: string | null; topic?: string | null; hook?: boolean },
+): Promise<string> {
+  // Phase 2: pass first brand logo as reference image when reachable. In dev
+  // (localhost backend) this returns null; falls back to text-to-image.
+  let referenceImageUrls: string[] | undefined;
+  const logoCount = Array.isArray(brand?.logos) ? brand.logos.length : 0;
+  if (logoCount > 0) {
+    const url = buildPublicLogoUrl(brand.id, 0);
+    if (url) referenceImageUrls = [url];
+  }
+  const { dataUrl } = await generateNanoBananaImage(prompt, {
+    timeoutMs: 120_000,
+    referenceImageUrls,
+  });
+
+  // AUTOMATION: bake a scroll-stopping text hook (auto-written) + the crisp
+  // brand logo onto the image, server-side. This is what makes auto-posts
+  // look like real scroll-stoppers without the user touching the Generate
+  // page. Hook defaults ON; the bake never throws (falls back to the raw
+  // image) so a render hiccup can't block publishing.
+  try {
+    const hookEnabled = overlay?.hook !== false;
+    let hookText = "";
+    if (hookEnabled) {
+      hookText = await writeImageHook({
+        brand: brand
+          ? {
+              name: brand.name,
+              industry: brand.industry,
+              targetAudience: brand.targetAudience,
+              voiceDescription: brand.voiceDescription ?? null,
+              tone: brand.tone ?? null,
+            }
+          : null,
+        topic: overlay?.topic ?? null,
+        postContent: overlay?.caption ?? null,
+      });
+    }
+    const logoDataUrl =
+      Array.isArray(brand?.logos) && typeof brand.logos[0] === "string" ? brand.logos[0] : null;
+    if (hookText || logoDataUrl) {
+      return await bakeImageOverlays(dataUrl, {
+        hookText,
+        hookPosition: "bottom",
+        logoDataUrl,
+        logoPosition: logoDataUrl ? "bottom_right" : "none",
+      });
+    }
+  } catch (err) {
+    logger.warn({ err: (err as any)?.message, brandId: brand?.id }, "Auto hook/logo bake failed; using raw image");
+  }
   return dataUrl;
 }
 
@@ -125,10 +256,23 @@ async function publishOnePlatform(
   caption: string,
 ) {
   if (platform === "facebook") {
-    return publishToFacebook({ userAccessToken: account.accessToken, imageUrl, caption });
+    // New picker-flow rows store the Page access token + Page ID directly so
+    // the publisher can post without re-fetching /me/accounts. Legacy rows
+    // (accountType=null) fall back to the discovery path inside publishers.ts.
+    return publishToFacebook({
+      userAccessToken: account.accessToken,
+      pageId: account.accountType === "facebook_page" ? account.platformUserId : null,
+      imageUrl,
+      caption,
+    });
   }
   if (platform === "instagram") {
-    return publishToInstagram({ userAccessToken: account.accessToken, imageUrl, caption });
+    return publishToInstagram({
+      userAccessToken: account.accessToken,
+      igUserId: account.accountType === "instagram_business" ? account.platformUserId : null,
+      imageUrl,
+      caption,
+    });
   }
   if (platform === "linkedin") {
     return publishToLinkedIn({
@@ -161,18 +305,27 @@ export async function retryPost(postId: number, workspaceId: number): Promise<
   }
   const { post, brand } = row;
 
-  const [account] = await db
-    .select()
+  // Account must be explicitly assigned to this post's brand. Workspace + platform
+  // alone is no longer enough — see brand_social_accounts join. This prevents
+  // accidentally posting a Brand A draft to Brand B's connected Page.
+  const [accountRow] = await db
+    .select({ account: socialAccountsTable })
     .from(socialAccountsTable)
+    .innerJoin(
+      brandSocialAccountsTable,
+      eq(brandSocialAccountsTable.socialAccountId, socialAccountsTable.id),
+    )
     .where(
       and(
         eq(socialAccountsTable.workspaceId, workspaceId),
         eq(socialAccountsTable.platform, post.platform),
         eq(socialAccountsTable.isActive, true),
+        eq(brandSocialAccountsTable.brandId, post.brandId),
       ),
     );
+  const account = accountRow?.account;
   if (!account) {
-    const msg = `No connected ${post.platform} account.`;
+    const msg = `No connected ${post.platform} account assigned to this brand.`;
     await db
       .update(postsTable)
       .set({ status: "failed", errorMessage: msg })
@@ -183,9 +336,9 @@ export async function retryPost(postId: number, workspaceId: number): Promise<
   // Reuse existing image/caption when present so retry is fast and consistent.
   let imageUrl = post.imageUrl;
   if (!imageUrl) {
-    const prompt = buildImagePrompt(brand, null, null);
+    const prompt = await buildImagePromptPro(brand, null, null, post.platform, post.content, hasReachableLogo(brand));
     try {
-      imageUrl = await generateImageDataUrl(prompt);
+      imageUrl = await generateImageDataUrl(prompt, brand, { caption: post.content ?? null });
     } catch (err: any) {
       const msg = `Image generation failed: ${err?.message ?? err}`;
       await db
@@ -294,9 +447,14 @@ async function processClaimedSlot(
   }
 
   const wsId = schedule.workspaceId ?? brand.workspaceId;
-  const [account] = await db
-    .select()
+  // Account must be assigned to this schedule's brand via brand_social_accounts.
+  const [accountRow] = await db
+    .select({ account: socialAccountsTable })
     .from(socialAccountsTable)
+    .innerJoin(
+      brandSocialAccountsTable,
+      eq(brandSocialAccountsTable.socialAccountId, socialAccountsTable.id),
+    )
     .where(
       and(
         wsId
@@ -304,12 +462,14 @@ async function processClaimedSlot(
           : eq(socialAccountsTable.userId, schedule.userId),
         eq(socialAccountsTable.platform, platform),
         eq(socialAccountsTable.isActive, true),
+        eq(brandSocialAccountsTable.brandId, schedule.brandId),
       ),
     );
+  const account = accountRow?.account;
   if (!account) {
     await db
       .update(postsTable)
-      .set({ status: "failed", errorMessage: `No connected ${platform} account.` })
+      .set({ status: "failed", errorMessage: `No connected ${platform} account assigned to this brand.` })
       .where(eq(postsTable.id, postRowId));
     return;
   }
@@ -318,19 +478,32 @@ async function processClaimedSlot(
     // Workspace requires admin approval before publishing scheduled posts.
     // Generate the caption + image so the admin can preview, then park the
     // row in pending_approval. Admin can approve to publish via the API.
-    const imagePromptOnly = buildImagePrompt(brand, schedule.contentPrompt, schedule.imageStyle);
-    let previewImageUrl: string | null = null;
-    try {
-      previewImageUrl = await generateImageDataUrl(imagePromptOnly);
-    } catch (err: any) {
-      logger.warn({ err: err?.message, scheduleId: schedule.id }, "Pending-approval image gen failed");
-    }
+    // Generate the caption FIRST so we can pass it to the image brief
+    // enhancer — that way the visual concept matches what the caption is
+    // actually about ("fresh roast Tuesday" → coffee scene, not generic).
     let previewCaption = "";
     try {
       previewCaption = await generateContent(brand, platform, schedule.contentPrompt);
     } catch (err: any) {
       previewCaption = "";
       logger.warn({ err: err?.message, scheduleId: schedule.id }, "Pending-approval caption gen failed");
+    }
+    const imagePromptOnly = await buildImagePromptPro(
+      brand,
+      schedule.contentPrompt,
+      schedule.imageStyle,
+      platform,
+      previewCaption || null,
+      hasReachableLogo(brand),
+    );
+    let previewImageUrl: string | null = null;
+    try {
+      previewImageUrl = await generateImageDataUrl(imagePromptOnly, brand, {
+        caption: previewCaption || null,
+        topic: schedule.contentPrompt ?? null,
+      });
+    } catch (err: any) {
+      logger.warn({ err: err?.message, scheduleId: schedule.id }, "Pending-approval image gen failed");
     }
     await db
       .update(postsTable)
@@ -343,10 +516,34 @@ async function processClaimedSlot(
     return;
   }
 
-  const imagePrompt = buildImagePrompt(brand, schedule.contentPrompt, schedule.imageStyle);
+  // Caption first, image second — same as the require-approval branch.
+  // The image brief enhancer reads the caption so the visual concept
+  // matches what the post is actually saying.
+  let caption = "";
+  try {
+    caption = await generateContent(brand, platform, schedule.contentPrompt);
+  } catch (err: any) {
+    await db
+      .update(postsTable)
+      .set({ status: "failed", errorMessage: `Caption generation failed: ${err?.message ?? err}` })
+      .where(eq(postsTable.id, postRowId));
+    return;
+  }
+
+  const imagePrompt = await buildImagePromptPro(
+    brand,
+    schedule.contentPrompt,
+    schedule.imageStyle,
+    platform,
+    caption || null,
+    hasReachableLogo(brand),
+  );
   let imageUrl: string;
   try {
-    imageUrl = await generateImageDataUrl(imagePrompt);
+    imageUrl = await generateImageDataUrl(imagePrompt, brand, {
+      caption: caption || null,
+      topic: schedule.contentPrompt ?? null,
+    });
   } catch (err: any) {
     const msg = `Image generation failed: ${err?.message ?? err}`;
     await db
@@ -357,20 +554,7 @@ async function processClaimedSlot(
     return;
   }
 
-  let caption = "";
-  try {
-    caption = await generateContent(brand, platform, schedule.contentPrompt);
-  } catch (err: any) {
-    await db
-      .update(postsTable)
-      .set({
-        status: "failed",
-        imageUrl,
-        errorMessage: `Caption generation failed: ${err?.message ?? err}`,
-      })
-      .where(eq(postsTable.id, postRowId));
-    return;
-  }
+  // (caption + imageUrl are both ready at this point)
 
   const result = await publishOnePlatform(platform, account, imageUrl, caption);
   await db
@@ -449,6 +633,37 @@ async function tick() {
         .update(postingSchedulesTable)
         .set({ lastRunAt: now })
         .where(eq(postingSchedulesTable.id, schedule.id));
+    }
+
+    // ── One-off scheduled posts ──────────────────────────────────────────────
+    // Users can hit "Schedule" on a generated draft from the Generate page;
+    // that PATCHes scheduledFor + sets status="scheduled". This sweep picks
+    // them up at their scheduled time and publishes via retryPost (which
+    // already handles the data-URL → multipart edge cases for FB/IG).
+    try {
+      const { lte, sql: sqlOp } = await import("drizzle-orm");
+      const due = await db
+        .select({ id: postsTable.id, workspaceId: postsTable.workspaceId })
+        .from(postsTable)
+        .where(
+          and(
+            eq(postsTable.status, "scheduled"),
+            // scheduledFor <= now (publish time has arrived or passed)
+            lte(postsTable.scheduledFor, now),
+          ),
+        )
+        .limit(20);
+      for (const p of due) {
+        if (!p.workspaceId) continue;
+        // Flip status to "failed" briefly so retryPost re-uses the existing
+        // content/image and publishes; retryPost is idempotent on success.
+        await db.update(postsTable).set({ status: "failed" }).where(eq(postsTable.id, p.id));
+        void retryPost(p.id, p.workspaceId).catch((err) => {
+          logger.error({ err, postId: p.id }, "One-off scheduled publish threw");
+        });
+      }
+    } catch (err) {
+      logger.error({ err }, "One-off scheduled-post sweep failed");
     }
   } catch (err) {
     logger.error({ err }, "Scheduler tick failed");

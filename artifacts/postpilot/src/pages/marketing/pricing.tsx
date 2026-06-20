@@ -87,9 +87,17 @@ export default function PricingPage() {
                 </span>
                 <span className="text-muted-foreground">/mo</span>
                 {cycle === "yearly" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Billed ${plan.price.yearly}/year
-                  </p>
+                  <>
+                    {/* Concrete annual savings — beats the buried "-17%"
+                        toggle hint. Number is the difference between paying
+                        12 monthly months and the annual price. */}
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">
+                      Save ${plan.price.monthly * 12 - plan.price.yearly}/year
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Billed ${plan.price.yearly} annually
+                    </p>
+                  </>
                 )}
               </div>
               <Link

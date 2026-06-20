@@ -1523,6 +1523,35 @@ components:
           type: string
         keywords:
           type: string
+        voiceDescription:
+          type: ["string", "null"]
+        examplePosts:
+          type: ["string", "null"]
+        doDontRules:
+          type: ["string", "null"]
+        logos:
+          type: ["array", "null"]
+          items:
+            type: string
+          maxItems: 3
+        websiteUrl:
+          type: ["string", "null"]
+        brandColorPrimary:
+          type: ["string", "null"]
+        brandColorSecondary:
+          type: ["string", "null"]
+        contentPillars:
+          type: ["object", "null"]
+          properties:
+            educate: { type: integer }
+            spotlight: { type: integer }
+            reviews: { type: integer }
+            bts: { type: integer }
+            promo: { type: integer }
+        platformOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            type: string
         platforms:
           type: array
           items:
@@ -1563,12 +1592,41 @@ components:
         industry:
           type: string
         tone:
-          type: string
-          enum: [friendly, professional, fun, inspirational]
+          type: ["string", "null"]
+          enum: ["friendly", "professional", "fun", "inspirational", null]
         targetAudience:
           type: string
         keywords:
           type: string
+        voiceDescription:
+          type: ["string", "null"]
+        examplePosts:
+          type: ["string", "null"]
+        doDontRules:
+          type: ["string", "null"]
+        logos:
+          type: ["array", "null"]
+          items:
+            type: string
+          maxItems: 3
+        websiteUrl:
+          type: ["string", "null"]
+        brandColorPrimary:
+          type: ["string", "null"]
+        brandColorSecondary:
+          type: ["string", "null"]
+        contentPillars:
+          type: ["object", "null"]
+          properties:
+            educate: { type: integer }
+            spotlight: { type: integer }
+            reviews: { type: integer }
+            bts: { type: integer }
+            promo: { type: integer }
+        platformOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            type: string
         platforms:
           type: ["array", "null"]
           items:
@@ -1583,7 +1641,6 @@ components:
       required:
         - name
         - industry
-        - tone
         - targetAudience
         - keywords
 
@@ -1600,6 +1657,35 @@ components:
           type: ["string", "null"]
         keywords:
           type: ["string", "null"]
+        voiceDescription:
+          type: ["string", "null"]
+        examplePosts:
+          type: ["string", "null"]
+        doDontRules:
+          type: ["string", "null"]
+        logos:
+          type: ["array", "null"]
+          items:
+            type: string
+          maxItems: 3
+        websiteUrl:
+          type: ["string", "null"]
+        brandColorPrimary:
+          type: ["string", "null"]
+        brandColorSecondary:
+          type: ["string", "null"]
+        contentPillars:
+          type: ["object", "null"]
+          properties:
+            educate: { type: integer }
+            spotlight: { type: integer }
+            reviews: { type: integer }
+            bts: { type: integer }
+            promo: { type: integer }
+        platformOverrides:
+          type: ["object", "null"]
+          additionalProperties:
+            type: string
         platforms:
           type: ["array", "null"]
           items:
@@ -1660,7 +1746,7 @@ components:
           type: integer
         platform:
           type: string
-          enum: [facebook, instagram, linkedin, tiktok]
+          enum: [facebook, instagram, linkedin]
         topic:
           type: ["string", "null"]
       required:
@@ -2082,6 +2168,9 @@ components:
           type: ["string", "null"]
         scheduledFor:
           type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+          enum: [generated, scheduled, null]
 
     BulkApprovalBody:
       type: object

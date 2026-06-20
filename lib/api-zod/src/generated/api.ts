@@ -56,6 +56,8 @@ export const UpdateMeResponse = zod.object({
 /**
  * @summary List all brands for current user
  */
+export const listBrandsResponseLogosMax = 3;
+
 export const ListBrandsResponseItem = zod.object({
   id: zod.number(),
   userId: zod.number(),
@@ -64,6 +66,23 @@ export const ListBrandsResponseItem = zod.object({
   tone: zod.enum(["friendly", "professional", "fun", "inspirational"]),
   targetAudience: zod.string(),
   keywords: zod.string(),
+  voiceDescription: zod.string().nullish(),
+  examplePosts: zod.string().nullish(),
+  doDontRules: zod.string().nullish(),
+  logos: zod.array(zod.string()).max(listBrandsResponseLogosMax).nullish(),
+  websiteUrl: zod.string().nullish(),
+  brandColorPrimary: zod.string().nullish(),
+  brandColorSecondary: zod.string().nullish(),
+  contentPillars: zod
+    .object({
+      educate: zod.number().optional(),
+      spotlight: zod.number().optional(),
+      reviews: zod.number().optional(),
+      bts: zod.number().optional(),
+      promo: zod.number().optional(),
+    })
+    .nullish(),
+  platformOverrides: zod.record(zod.string(), zod.string()).nullish(),
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
@@ -77,12 +96,39 @@ export const ListBrandsResponse = zod.array(ListBrandsResponseItem);
 /**
  * @summary Create a new brand
  */
+export const createBrandBodyLogosMax = 3;
+
 export const CreateBrandBody = zod.object({
   name: zod.string(),
   industry: zod.string(),
-  tone: zod.enum(["friendly", "professional", "fun", "inspirational"]),
+  tone: zod
+    .union([
+      zod.literal("friendly"),
+      zod.literal("professional"),
+      zod.literal("fun"),
+      zod.literal("inspirational"),
+      zod.literal(null),
+    ])
+    .nullish(),
   targetAudience: zod.string(),
   keywords: zod.string(),
+  voiceDescription: zod.string().nullish(),
+  examplePosts: zod.string().nullish(),
+  doDontRules: zod.string().nullish(),
+  logos: zod.array(zod.string()).max(createBrandBodyLogosMax).nullish(),
+  websiteUrl: zod.string().nullish(),
+  brandColorPrimary: zod.string().nullish(),
+  brandColorSecondary: zod.string().nullish(),
+  contentPillars: zod
+    .object({
+      educate: zod.number().optional(),
+      spotlight: zod.number().optional(),
+      reviews: zod.number().optional(),
+      bts: zod.number().optional(),
+      promo: zod.number().optional(),
+    })
+    .nullish(),
+  platformOverrides: zod.record(zod.string(), zod.string()).nullish(),
   platforms: zod.array(zod.string()).nullish(),
   postTime: zod.string().nullish(),
   approvalMode: zod
@@ -98,6 +144,8 @@ export const GetBrandParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getBrandResponseLogosMax = 3;
+
 export const GetBrandResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
@@ -106,6 +154,23 @@ export const GetBrandResponse = zod.object({
   tone: zod.enum(["friendly", "professional", "fun", "inspirational"]),
   targetAudience: zod.string(),
   keywords: zod.string(),
+  voiceDescription: zod.string().nullish(),
+  examplePosts: zod.string().nullish(),
+  doDontRules: zod.string().nullish(),
+  logos: zod.array(zod.string()).max(getBrandResponseLogosMax).nullish(),
+  websiteUrl: zod.string().nullish(),
+  brandColorPrimary: zod.string().nullish(),
+  brandColorSecondary: zod.string().nullish(),
+  contentPillars: zod
+    .object({
+      educate: zod.number().optional(),
+      spotlight: zod.number().optional(),
+      reviews: zod.number().optional(),
+      bts: zod.number().optional(),
+      promo: zod.number().optional(),
+    })
+    .nullish(),
+  platformOverrides: zod.record(zod.string(), zod.string()).nullish(),
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
@@ -122,12 +187,31 @@ export const UpdateBrandParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateBrandBodyLogosMax = 3;
+
 export const UpdateBrandBody = zod.object({
   name: zod.string().nullish(),
   industry: zod.string().nullish(),
   tone: zod.string().nullish(),
   targetAudience: zod.string().nullish(),
   keywords: zod.string().nullish(),
+  voiceDescription: zod.string().nullish(),
+  examplePosts: zod.string().nullish(),
+  doDontRules: zod.string().nullish(),
+  logos: zod.array(zod.string()).max(updateBrandBodyLogosMax).nullish(),
+  websiteUrl: zod.string().nullish(),
+  brandColorPrimary: zod.string().nullish(),
+  brandColorSecondary: zod.string().nullish(),
+  contentPillars: zod
+    .object({
+      educate: zod.number().optional(),
+      spotlight: zod.number().optional(),
+      reviews: zod.number().optional(),
+      bts: zod.number().optional(),
+      promo: zod.number().optional(),
+    })
+    .nullish(),
+  platformOverrides: zod.record(zod.string(), zod.string()).nullish(),
   platforms: zod.array(zod.string()).nullish(),
   postTime: zod.string().nullish(),
   active: zod.boolean().nullish(),
@@ -137,6 +221,8 @@ export const UpdateBrandBody = zod.object({
   autoGenerateEnabled: zod.boolean().nullish(),
 });
 
+export const updateBrandResponseLogosMax = 3;
+
 export const UpdateBrandResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
@@ -145,6 +231,23 @@ export const UpdateBrandResponse = zod.object({
   tone: zod.enum(["friendly", "professional", "fun", "inspirational"]),
   targetAudience: zod.string(),
   keywords: zod.string(),
+  voiceDescription: zod.string().nullish(),
+  examplePosts: zod.string().nullish(),
+  doDontRules: zod.string().nullish(),
+  logos: zod.array(zod.string()).max(updateBrandResponseLogosMax).nullish(),
+  websiteUrl: zod.string().nullish(),
+  brandColorPrimary: zod.string().nullish(),
+  brandColorSecondary: zod.string().nullish(),
+  contentPillars: zod
+    .object({
+      educate: zod.number().optional(),
+      spotlight: zod.number().optional(),
+      reviews: zod.number().optional(),
+      bts: zod.number().optional(),
+      promo: zod.number().optional(),
+    })
+    .nullish(),
+  platformOverrides: zod.record(zod.string(), zod.string()).nullish(),
   platforms: zod.array(zod.string()),
   postTime: zod.string(),
   active: zod.boolean(),
@@ -211,7 +314,7 @@ export const DeletePostParams = zod.object({
  */
 export const GeneratePostBody = zod.object({
   brandId: zod.number(),
-  platform: zod.enum(["facebook", "instagram", "linkedin", "tiktok"]),
+  platform: zod.enum(["facebook", "instagram", "linkedin"]),
   topic: zod.string().nullish(),
 });
 
@@ -614,6 +717,7 @@ export const PatchApprovalPostsIdBody = zod.object({
   content: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
   scheduledFor: zod.string().nullish(),
+  status: zod.enum(["generated", "scheduled"]).nullish(),
 });
 
 export const PatchApprovalPostsIdResponse = zod.object({

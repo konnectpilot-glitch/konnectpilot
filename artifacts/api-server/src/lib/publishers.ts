@@ -21,38 +21,75 @@ async function fetchImageBytes(imageUrl: string): Promise<{ bytes: Buffer; conte
 }
 
 export async function publishToFacebook(opts: {
+  // For new accountType="facebook_page" rows this IS the Page access token +
+  // pageId; for legacy rows (accountType=null) it's the user access token and
+  // pageId is omitted, so we fall back to /me/accounts → first Page.
   userAccessToken: string;
+  pageId?: string | null;
   imageUrl: string;
   caption: string;
 }): Promise<PublishResult> {
   try {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(opts.userAccessToken)}`,
-    );
-    if (!pagesRes.ok) {
-      return { ok: false, error: `Facebook pages list failed: ${await pagesRes.text()}` };
-    }
-    const pagesData = (await pagesRes.json()) as {
-      data?: Array<{ id: string; name: string; access_token: string }>;
-    };
-    const page = pagesData.data?.[0];
-    if (!page) {
-      return {
-        ok: false,
-        error: "No Facebook Pages found on this account. Create or get admin access to a Page first.",
+    let pageId = opts.pageId;
+    let pageAccessToken = opts.userAccessToken;
+
+    // Legacy path: no pageId stored. Re-discover via /me/accounts (this is
+    // the pre-picker behavior — auto-picks first Page).
+    if (!pageId) {
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(opts.userAccessToken)}`,
+      );
+      if (!pagesRes.ok) {
+        return { ok: false, error: `Facebook pages list failed: ${await pagesRes.text()}` };
+      }
+      const pagesData = (await pagesRes.json()) as {
+        data?: Array<{ id: string; name: string; access_token: string }>;
       };
+      const page = pagesData.data?.[0];
+      if (!page) {
+        return {
+          ok: false,
+          error: "No Facebook Pages found on this account. Create or get admin access to a Page first.",
+        };
+      }
+      pageId = page.id;
+      pageAccessToken = page.access_token;
     }
 
-    const params = new URLSearchParams({
-      url: opts.imageUrl,
-      message: opts.caption,
-      access_token: page.access_token,
-    });
-    const postRes = await fetch(`https://graph.facebook.com/v19.0/${page.id}/photos`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
-    });
+    // Facebook's /photos endpoint accepts either ?url= (public HTTP image URL)
+    // or source= as a multipart binary upload. Our images come from AI providers
+    // as base64 data URLs, which the ?url= path rejects with "(#100) url should
+    // represent a valid URL". Detect data URLs and switch to multipart upload.
+    let postRes: Response;
+    if (opts.imageUrl.startsWith("data:")) {
+      const match = opts.imageUrl.match(/^data:([^;,]+)(?:;base64)?,(.*)$/);
+      if (!match) {
+        return { ok: false, error: "Invalid data URL for image" };
+      }
+      const mime = match[1] || "image/png";
+      const b64 = match[2] || "";
+      const ext = mime.split("/")[1]?.split("+")[0] ?? "png";
+      const buffer = Buffer.from(b64, "base64");
+      const form = new FormData();
+      form.append("message", opts.caption);
+      form.append("access_token", pageAccessToken);
+      form.append("source", new Blob([buffer], { type: mime }), `image.${ext}`);
+      postRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+        method: "POST",
+        body: form,
+      });
+    } else {
+      const params = new URLSearchParams({
+        url: opts.imageUrl,
+        message: opts.caption,
+        access_token: pageAccessToken,
+      });
+      postRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+    }
     const postBody = await postRes.text();
     if (!postRes.ok) {
       return { ok: false, error: `Facebook photo publish failed: ${postBody}` };
@@ -71,46 +108,71 @@ export async function publishToFacebook(opts: {
 }
 
 export async function publishToInstagram(opts: {
+  // For new accountType="instagram_business" rows: userAccessToken IS the
+  // parent Page's access token, and igUserId is the IG Business account ID.
+  // For legacy rows: userAccessToken is a user token; igUserId is omitted, so
+  // we fall back to discovering the first linked IG via /me/accounts.
   userAccessToken: string;
+  igUserId?: string | null;
   imageUrl: string;
   caption: string;
 }): Promise<PublishResult> {
   try {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(opts.userAccessToken)}`,
-    );
-    if (!pagesRes.ok) {
-      return { ok: false, error: `Instagram pages list failed: ${await pagesRes.text()}` };
-    }
-    const pagesData = (await pagesRes.json()) as {
-      data?: Array<{ id: string; name: string; access_token: string }>;
-    };
-    let igUserId: string | undefined;
-    let pageAccessToken: string | undefined;
-    for (const page of pagesData.data ?? []) {
-      const igRes = await fetch(
-        `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${encodeURIComponent(page.access_token)}`,
+    let igUserId = opts.igUserId ?? undefined;
+    let pageAccessToken = opts.userAccessToken;
+
+    if (!igUserId) {
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(opts.userAccessToken)}`,
       );
-      if (!igRes.ok) continue;
-      const igData = (await igRes.json()) as {
-        instagram_business_account?: { id: string };
-      };
-      if (igData.instagram_business_account?.id) {
-        igUserId = igData.instagram_business_account.id;
-        pageAccessToken = page.access_token;
-        break;
+      if (!pagesRes.ok) {
+        return { ok: false, error: `Instagram pages list failed: ${await pagesRes.text()}` };
       }
-    }
-    if (!igUserId || !pageAccessToken) {
-      return {
-        ok: false,
-        error:
-          "No Instagram Business account found. Link an Instagram Business account to a Facebook Page first.",
+      const pagesData = (await pagesRes.json()) as {
+        data?: Array<{ id: string; name: string; access_token: string }>;
       };
+      let foundPageToken: string | undefined;
+      for (const page of pagesData.data ?? []) {
+        const igRes = await fetch(
+          `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${encodeURIComponent(page.access_token)}`,
+        );
+        if (!igRes.ok) continue;
+        const igData = (await igRes.json()) as {
+          instagram_business_account?: { id: string };
+        };
+        if (igData.instagram_business_account?.id) {
+          igUserId = igData.instagram_business_account.id;
+          foundPageToken = page.access_token;
+          break;
+        }
+      }
+      if (!igUserId || !foundPageToken) {
+        return {
+          ok: false,
+          error:
+            "No Instagram Business account found. Link an Instagram Business account to a Facebook Page first.",
+        };
+      }
+      pageAccessToken = foundPageToken;
+    }
+
+    // Instagram's /media endpoint REQUIRES a public HTTPS image_url and won't
+    // fetch data: URLs (returns "(#100) Invalid parameter"). Convert data URLs
+    // to a temporary public URL served from our backend via the registered
+    // image cache (see app.ts registerImageBlob + /img/:key route).
+    let publicImageUrl = opts.imageUrl;
+    if (publicImageUrl.startsWith("data:")) {
+      const { registerImageBlob } = await import("../app");
+      const key = registerImageBlob(publicImageUrl);
+      const base = process.env.PUBLIC_BACKEND_URL;
+      if (!base) {
+        return { ok: false, error: "PUBLIC_BACKEND_URL env var not set; cannot serve image to Instagram" };
+      }
+      publicImageUrl = `${base.replace(/\/$/, "")}/img/${key}`;
     }
 
     const containerParams = new URLSearchParams({
-      image_url: opts.imageUrl,
+      image_url: publicImageUrl,
       caption: opts.caption,
       access_token: pageAccessToken,
     });

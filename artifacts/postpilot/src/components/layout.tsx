@@ -14,31 +14,45 @@ import {
   Shield,
   ClipboardCheck,
   Users,
+  ChevronDown,
+  ChevronRight,
+  MessageSquare,
+  Inbox,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
-import { CalendarDays, Library, DollarSign, LineChart } from "lucide-react";
+import { CalendarDays, Library, DollarSign, LineChart, type LucideIcon } from "lucide-react";
 import { useGetMe, useGetMyUsage } from "@workspace/api-client-react";
 import NotificationsBell from "./notifications-bell";
 import ImpersonationBanner from "./impersonation-banner";
 import WorkspaceSwitcher from "./workspace-switcher";
 import { KpLogo } from "@/components/kp-logo";
+import ThemeToggle from "./theme-toggle";
+import CommandPalette from "./command-palette";
 
-type NavItem = { href: string; label: string; icon: any };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 
-const navItems: NavItem[] = [
+// Audit v2: cut sidebar from 13 → 7 visible items. The 7 are the daily-use
+// surfaces; the other six live behind a collapsible "More" section. Cmd+K
+// still surfaces everything for power users.
+const primaryNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/brands", label: "Brands", icon: Building2 },
   { href: "/generate", label: "Generate Post", icon: Sparkles },
-  { href: "/library", label: "Library", icon: Library },
+  { href: "/inbox", label: "Comment Inbox", icon: Inbox },
+  { href: "/brands", label: "Brands", icon: Building2 },
   { href: "/approval", label: "Approval Queue", icon: ClipboardCheck },
-  { href: "/posts", label: "Post History", icon: FileText },
   { href: "/analytics", label: "Analytics", icon: LineChart },
   { href: "/accounts", label: "Social Accounts", icon: Share2 },
-  { href: "/affiliate", label: "Affiliate", icon: DollarSign },
+];
+
+const moreNavItems: NavItem[] = [
+  { href: "/library", label: "Library", icon: Library },
+  { href: "/posts", label: "Post History", icon: FileText },
+  { href: "/reply-drafter", label: "Reply Drafter", icon: MessageSquare },
   { href: "/team", label: "Team", icon: Users },
+  { href: "/affiliate", label: "Affiliate", icon: DollarSign },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -46,11 +60,12 @@ const navItems: NavItem[] = [
 const adminNavItem: NavItem = { href: "/admin", label: "Admin", icon: Shield };
 
 function PlanBadge({ plan }: { plan: string }) {
+  // Dark-mode-aware plan badges.
   const colors: Record<string, string> = {
     free: "bg-secondary text-muted-foreground",
-    starter: "bg-blue-50 text-blue-700",
-    pro: "bg-purple-50 text-purple-700",
-    agency: "bg-amber-50 text-amber-700",
+    starter: "bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    pro: "bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300",
+    agency: "bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300",
   };
   const label = plan === "free" ? "Free plan" : `${plan} plan`;
   return (
@@ -67,8 +82,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: me } = useGetMe();
   const { data: usage } = useGetMyUsage();
-  const visibleNavItems = me?.isSuperadmin ? [...navItems, adminNavItem] : navItems;
   const currentPlan = usage?.plan ?? "free";
+  // Persist "More" expansion in localStorage so user's choice survives reloads.
+  const [moreOpen, setMoreOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("konnectpilot:sidebar:more") === "1";
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("konnectpilot:sidebar:more", moreOpen ? "1" : "0"); } catch {}
+  }, [moreOpen]);
+  // Auto-open More when the current route is inside it, so the active item
+  // doesn't hide behind a collapsed header.
+  useEffect(() => {
+    if (moreNavItems.some((i) => location === i.href || location.startsWith(i.href + "/"))) {
+      setMoreOpen(true);
+    }
+  }, [location]);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -78,8 +107,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {visibleNavItems.map(({ href, label, icon: Icon }) => {
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {/* Primary 7 — the daily-use surfaces */}
+        {primaryNavItems.map(({ href, label, icon: Icon }) => {
           const isActive = location === href || location.startsWith(href + "?") || location.startsWith(href + "/");
           return (
             <Link
@@ -98,6 +128,51 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+
+        {/* More — collapsible group for less-frequent surfaces */}
+        <button
+          onClick={() => setMoreOpen((v) => !v)}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full mt-3"
+        >
+          {moreOpen ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />}
+          <span className="flex-1 text-left text-xs uppercase tracking-wider font-semibold">More</span>
+        </button>
+        {moreOpen && moreNavItems.map(({ href, label, icon: Icon }) => {
+          const isActive = location === href || location.startsWith(href + "?") || location.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ml-2",
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{label}</span>
+            </Link>
+          );
+        })}
+
+        {/* Admin link — only superadmins. Always at the very bottom. */}
+        {me?.isSuperadmin && (
+          <Link
+            href={adminNavItem.href}
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors mt-3",
+              location === adminNavItem.href || location.startsWith(adminNavItem.href + "/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+          >
+            <adminNavItem.icon className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1">{adminNavItem.label}</span>
+          </Link>
+        )}
       </nav>
 
       <div className="px-3 py-4 border-t border-border">
@@ -128,6 +203,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <ImpersonationBanner />
+      <CommandPalette />
       <div className="flex flex-1 overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 border-r border-border bg-card flex-shrink-0">
@@ -151,6 +227,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <KpLogo size="sm" />
           <div className="flex items-center gap-1">
             <WorkspaceSwitcher />
+            <ThemeToggle />
             <NotificationsBell />
             <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-secondary">
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -160,7 +237,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Desktop top bar */}
         <header className="hidden md:flex items-center justify-end gap-3 px-6 py-3 border-b border-border bg-card">
+          {/* Cmd+K discoverability — clicking it dispatches the same event */}
+          <button
+            onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            title="Open command palette"
+          >
+            <span>Search or jump to…</span>
+            <kbd className="font-mono bg-secondary px-1.5 py-0.5 rounded text-[10px]">⌘K</kbd>
+          </button>
           <WorkspaceSwitcher />
+          <ThemeToggle />
           <NotificationsBell />
         </header>
 

@@ -14,6 +14,8 @@ import {
   getListPostsQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { friendlyError } from "@/lib/friendly-error";
+import { useWorkspace } from "@/lib/workspaceContext";
 import {
   Dialog,
   DialogContent,
@@ -397,7 +399,7 @@ function ScheduleHistory({ scheduleId, token }: { scheduleId: number; token: str
       queryClient.invalidateQueries({ queryKey: ["schedule-posts", scheduleId] });
       toast.success("Post published");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't retry that post. Please try again.")),
   });
 
   if (isLoading) {
@@ -558,7 +560,7 @@ function OverviewTab({ brand, brandId }: { brand: any; brandId: number }) {
           toast.success("Brand updated");
           setEditing(false);
         },
-        onError: (err: any) => toast.error(err?.data?.error ?? "Failed to update"),
+        onError: (err: any) => toast.error(friendlyError(err, "Couldn't update the brand. Please try again.")),
       },
     );
   }
@@ -566,6 +568,7 @@ function OverviewTab({ brand, brandId }: { brand: any; brandId: number }) {
   if (!editing) {
     return (
       <div className="space-y-4">
+        <BrandIntelligencePanel brandId={brandId} />
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-sm">Brand identity</h2>
@@ -607,7 +610,9 @@ function OverviewTab({ brand, brandId }: { brand: any; brandId: number }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div className="space-y-4">
+      <BrandIntelligencePanel brandId={brandId} />
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-card border border-border rounded-xl p-5 space-y-4">
       <h2 className="font-semibold text-sm">Edit brand identity</h2>
 
       <div>
@@ -683,6 +688,132 @@ function OverviewTab({ brand, brandId }: { brand: any; brandId: number }) {
         </Button>
       </div>
     </form>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Brand Intelligence — surfaces what the AI has learned about this brand.
+// Pulls from /api/brands/:id/intelligence which joins brand_memory_profiles +
+// post_feedback_events + performance_memory + post counts in one endpoint.
+// This is the "killer feature visible" fix: until now, the brand-memory loop
+// ran silently in the background. Now users see the moat.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function BrandIntelligencePanel({ brandId }: { brandId: number }) {
+  const { getToken } = useAuth();
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getToken().then((t) => { if (!cancelled) setToken(t); });
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["brand-intelligence", brandId],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/brands/${brandId}/intelligence`, {
+        headers: authHeaders(token),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  if (isLoading || !data) {
+    return (
+      <div className="bg-gradient-to-br from-primary/5 to-purple-500/5 border border-primary/20 rounded-xl p-5">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading brand intelligence…
+        </div>
+      </div>
+    );
+  }
+
+  const { headline, counts, topPlatform, platformBreakdown, distilledGuidelines, recentFeedback, performance } = data;
+  const learnedSomething = (counts?.learnedThings ?? 0) > 0 || (counts?.totalPublished ?? 0) > 0;
+
+  return (
+    <div className="bg-gradient-to-br from-primary/5 to-purple-500/5 border border-primary/20 rounded-xl p-5">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-sm text-foreground">Brand Intelligence</h2>
+          </div>
+          <p className="text-[15px] font-semibold leading-snug text-foreground">{headline}</p>
+        </div>
+      </div>
+
+      {/* Counts strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <IntelStat label="Approved" value={counts.approved} accent="text-green-700" />
+        <IntelStat label="Rejected" value={counts.rejected} accent="text-rose-700" />
+        <IntelStat label="Edits" value={counts.edited} accent="text-blue-700" />
+        <IntelStat label="Live posts" value={counts.totalPublished} accent="text-primary" />
+      </div>
+
+      {!learnedSomething ? (
+        <div className="bg-card/50 border border-dashed border-primary/30 rounded-lg p-4 text-center text-xs text-muted-foreground">
+          Once you approve, edit, or publish a few posts, this panel will show what the AI has learned about your brand voice and audience.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {topPlatform && (
+            <div className="bg-card/70 rounded-lg p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1">Strongest platform</p>
+              <p className="text-sm font-medium capitalize">
+                {topPlatform} — {platformBreakdown[0]?.count ?? 0} published posts
+              </p>
+            </div>
+          )}
+          {distilledGuidelines && (
+            <div className="bg-card/70 rounded-lg p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1">What I've learned about your voice</p>
+              <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{distilledGuidelines}</p>
+            </div>
+          )}
+          {performance?.topHooks && Array.isArray(performance.topHooks) && performance.topHooks.length > 0 && (
+            <div className="bg-card/70 rounded-lg p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">Top-performing hooks</p>
+              <ul className="space-y-1">
+                {performance.topHooks.slice(0, 3).map((h: string, i: number) => (
+                  <li key={i} className="text-xs text-foreground">• {h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {recentFeedback && recentFeedback.length > 0 && (
+            <div className="bg-card/70 rounded-lg p-3">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-1.5">Recent signals</p>
+              <ul className="space-y-1">
+                {recentFeedback.slice(0, 3).map((f: any, i: number) => (
+                  <li key={i} className="text-xs text-foreground">
+                    <span className={`capitalize font-medium ${
+                      f.action === "approved" ? "text-green-700" :
+                      f.action === "rejected" ? "text-rose-700" :
+                      "text-blue-700"
+                    }`}>{f.action}</span>
+                    {f.reason ? `: ${f.reason}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IntelStat({ label, value, accent }: { label: string; value: number; accent: string }) {
+  return (
+    <div className="bg-card/70 rounded-lg p-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{label}</p>
+      <p className={`text-2xl font-bold ${accent}`}>{value ?? 0}</p>
+    </div>
   );
 }
 
@@ -692,16 +823,32 @@ function OverviewTab({ brand, brandId }: { brand: any; brandId: number }) {
 
 function SchedulesTab({ brandId, token }: { brandId: number; token: string | null }) {
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+  const { activeWorkspace } = useWorkspace();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [historyId, setHistoryId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
+  // Headers helper — refreshes the Clerk token on every call so we never send
+  // an expired one (which was the cause of the "Unauthorized" toast after the
+  // page sat idle for >60s). Also attaches the workspace header so server-side
+  // requireWorkspace doesn't fall back to the wrong tenant.
+  async function authedHeaders(): Promise<Record<string, string>> {
+    const t = await getToken();
+    return {
+      "Content-Type": "application/json",
+      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      ...(activeWorkspace ? { "X-Workspace-Id": String(activeWorkspace.id) } : {}),
+    };
+  }
+
   const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
     queryKey: ["schedules"],
     enabled: !!token,
     queryFn: async () => {
-      const res = await fetch(`${BASE_URL}/api/schedules`, { headers: authHeaders(token) });
+      const headers = await authedHeaders();
+      const res = await fetch(`${BASE_URL}/api/schedules`, { headers });
       if (!res.ok) throw new Error("Failed to load schedules");
       return res.json();
     },
@@ -714,12 +861,19 @@ function SchedulesTab({ brandId, token }: { brandId: number; token: string | nul
 
   const createMut = useMutation({
     mutationFn: async (values: any) => {
+      const headers = await authedHeaders();
       const res = await fetch(`${BASE_URL}/api/schedules`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        headers,
         body: JSON.stringify(values),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const apiErr: any = new Error(body?.error ?? `Save failed (${res.status})`);
+        apiErr.status = res.status;
+        apiErr.data = body;
+        throw apiErr;
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -727,17 +881,24 @@ function SchedulesTab({ brandId, token }: { brandId: number; token: string | nul
       toast.success("Schedule created");
       setShowForm(false);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to create"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't create the schedule. Please try again.")),
   });
 
   const updateMut = useMutation({
     mutationFn: async ({ id, values }: { id: number; values: any }) => {
+      const headers = await authedHeaders();
       const res = await fetch(`${BASE_URL}/api/schedules/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        headers,
         body: JSON.stringify(values),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const apiErr: any = new Error(body?.error ?? `Update failed (${res.status})`);
+        apiErr.status = res.status;
+        apiErr.data = body;
+        throw apiErr;
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -745,21 +906,29 @@ function SchedulesTab({ brandId, token }: { brandId: number; token: string | nul
       toast.success("Schedule updated");
       setEditing(null);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to update"),
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't update the schedule. Please try again.")),
   });
 
   const deleteMut = useMutation({
     mutationFn: async (id: number) => {
+      const headers = await authedHeaders();
       const res = await fetch(`${BASE_URL}/api/schedules/${id}`, {
         method: "DELETE",
-        headers: authHeaders(token),
+        headers,
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const apiErr: any = new Error(body?.error ?? `Delete failed (${res.status})`);
+        apiErr.status = res.status;
+        apiErr.data = body;
+        throw apiErr;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
       toast.success("Schedule deleted");
     },
+    onError: (e: any) => toast.error(friendlyError(e, "Couldn't delete the schedule. Please try again.")),
   });
 
   const togglePause = (s: Schedule) => updateMut.mutate({ id: s.id, values: { isActive: !s.isActive } });
@@ -1028,8 +1197,10 @@ function PostsTab({ brandId }: { brandId: number }) {
 // Connections tab
 // ──────────────────────────────────────────────────────────────────────────────
 
-function ConnectionsTab({ token }: { token: string | null }) {
-  const { data: accounts = [], isLoading } = useQuery<any[]>({
+function ConnectionsTab({ token, brandId }: { token: string | null; brandId: number }) {
+  const qc = useQueryClient();
+  // All accounts in the workspace.
+  const { data: workspaceAccounts = [], isLoading: loadingWs } = useQuery<any[]>({
     queryKey: ["social-accounts"],
     enabled: !!token,
     queryFn: async () => {
@@ -1038,13 +1209,39 @@ function ConnectionsTab({ token }: { token: string | null }) {
       return res.json();
     },
   });
+  // Accounts already assigned to this brand.
+  const { data: brandAccounts = [], isLoading: loadingBrand } = useQuery<any[]>({
+    queryKey: ["brand-social-accounts", brandId],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/brands/${brandId}/social-accounts`, { headers: authHeaders(token) });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+  const assignedIds = new Set<number>(brandAccounts.map((a: any) => a.id));
+
+  async function toggle(accountId: number, currentlyAssigned: boolean) {
+    const method = currentlyAssigned ? "DELETE" : "POST";
+    const res = await fetch(`${BASE_URL}/api/brands/${brandId}/social-accounts/${accountId}`, {
+      method,
+      headers: authHeaders(token),
+    });
+    if (!res.ok) {
+      toast.error("Couldn't update assignment");
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["brand-social-accounts", brandId] });
+  }
+
+  const isLoading = loadingWs || loadingBrand;
 
   return (
     <div className="space-y-3">
       <div>
         <h2 className="text-sm font-semibold">Connected accounts</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Social accounts are connected at the workspace level and shared across all brands.
+          Choose which workspace-connected accounts this brand publishes from. Only assigned accounts are used by the scheduler and manual publish.
         </p>
       </div>
 
@@ -1052,12 +1249,12 @@ function ConnectionsTab({ token }: { token: string | null }) {
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
         </div>
-      ) : accounts.length === 0 ? (
+      ) : workspaceAccounts.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-border rounded-xl">
           <Link2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="font-medium text-sm">No social accounts connected</p>
+          <p className="font-medium text-sm">No social accounts connected to this workspace</p>
           <p className="text-xs text-muted-foreground mt-1 mb-4">
-            Without a connected account, schedules will generate posts but can't publish.
+            Connect at least one account, then come back to assign it to this brand.
           </p>
           <Link href="/accounts">
             <Button size="sm">
@@ -1068,8 +1265,9 @@ function ConnectionsTab({ token }: { token: string | null }) {
       ) : (
         <>
           <div className="grid gap-2">
-            {accounts.map((a: any) => {
+            {workspaceAccounts.map((a: any) => {
               const opt = PLATFORM_OPTIONS.find((o) => o.id === a.platform);
+              const isAssigned = assignedIds.has(a.id);
               return (
                 <div key={a.id} className="border border-border rounded-lg p-3 flex items-center gap-3 bg-card">
                   <div
@@ -1082,15 +1280,19 @@ function ConnectionsTab({ token }: { token: string | null }) {
                     <p className="text-sm font-medium truncate">{a.accountName ?? opt?.label ?? a.platform}</p>
                     <p className="text-[11px] text-muted-foreground capitalize">{a.platform}</p>
                   </div>
-                  {a.isActive ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
-                      Active
-                    </span>
-                  ) : (
+                  {!a.isActive && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">
                       Inactive
                     </span>
                   )}
+                  <Button
+                    size="sm"
+                    variant={isAssigned ? "default" : "outline"}
+                    onClick={() => toggle(a.id, isAssigned)}
+                    disabled={!a.isActive}
+                  >
+                    {isAssigned ? "Assigned" : "Assign"}
+                  </Button>
                 </div>
               );
             })}
@@ -1241,7 +1443,7 @@ export default function BrandDetailPage() {
           {tab === "overview" && <OverviewTab brand={brand} brandId={brandId} />}
           {tab === "schedules" && <SchedulesTab brandId={brandId} token={token} />}
           {tab === "posts" && <PostsTab brandId={brandId} />}
-          {tab === "connections" && <ConnectionsTab token={token} />}
+          {tab === "connections" && <ConnectionsTab token={token} brandId={brandId} />}
         </div>
 
         <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

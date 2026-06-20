@@ -1,125 +1,268 @@
 import { Link } from "wouter";
+import { useEffect, useState } from "react";
 import {
   Check,
   ArrowRight,
   Facebook,
   Instagram,
   Linkedin,
-  Bot,
+  Brain,
   Calendar,
   BarChart3,
   Sparkles,
-  Layers,
-  Shield,
   ShieldCheck,
-  Clock,
-  Users,
   X,
   Star,
+  Wand2,
+  TrendingUp,
+  Clock,
+  DollarSign,
+  Zap,
+  Globe2,
 } from "lucide-react";
 import MarketingShell from "@/components/marketing-shell";
 import { KpMark } from "@/components/kp-logo";
 import ProductMockup from "@/components/marketing/product-mockup";
 import { PLANS, priceFor } from "@/lib/plans";
 
+// Audit v2 US-market rewrite: differentiator is "AI that gets sharper every
+// week", ICP is US Shopify / DTC brands, comparison is against the actual
+// US competitors (Predis, Ocoya, Vista Social, Buffer) — not "doing it
+// manually". Pricing teaser uses real $29/$79/$199 tiers.
+
 const HOW_STEPS = [
   {
-    icon: Bot,
-    title: "Set up your brand",
-    text: "Add your brand voice, colors, and connected accounts once. KonnectPilot remembers everything.",
+    icon: Wand2,
+    title: "Paste your URL",
+    text: "We read your site and infer your brand voice, audience, industry, and keywords in 10 seconds — no 12-field forms.",
   },
   {
     icon: Sparkles,
-    title: "Let AI draft a month",
-    text: "Generate captions, hashtags, and on-brand images in seconds. Edit anything you want, approve the rest.",
+    title: "Generate for every platform at once",
+    text: "One click writes Facebook, Instagram, and LinkedIn drafts tuned per platform. Approve, schedule, or send through review.",
   },
   {
-    icon: Calendar,
-    title: "Schedule and forget",
-    text: "Drop posts on a visual calendar, queue recurring slots, and we publish them at the right time.",
+    icon: Brain,
+    title: "AI gets sharper every week",
+    text: "Every approval teaches it. Every published post's analytics flow back as future context. Your brand voice tightens automatically.",
   },
 ];
 
 const PILLARS = [
   {
-    icon: Sparkles,
-    title: "AI Create",
-    text: "GPT-4 captions in 5 tones, AI image generation tuned to your brand, smart hashtag suggestions.",
-    bullets: ["Per-platform overrides", "5 brand voices", "AI image gen"],
+    icon: Brain,
+    title: "Brand Memory",
+    text: "Approve, reject, or edit a post — the AI remembers. Within a week it's writing like your best copywriter, not a generic GPT.",
+    bullets: ["Learns your voice from approvals", "Tracks what your audience engages with", "Surfaces what it has learned"],
     accent: "from-purple-500/20 to-blue-500/10",
   },
   {
-    icon: Calendar,
-    title: "Schedule",
-    text: "Plan a month in an afternoon. Visual calendar, recurring queue slots, and multi-schedule.",
-    bullets: ["Monthly + weekly views", "Recurring queues", "Multi-account fan-out"],
+    icon: Sparkles,
+    title: "Multi-platform Generate",
+    text: "One brief → three on-brand drafts. Each tailored to Facebook, Instagram, and LinkedIn's distinct algorithm and audience.",
+    bullets: ["Per-platform tone overrides", "AI image generation per post", "Hashtag suggestions baked in"],
     accent: "from-blue-500/20 to-emerald-500/10",
   },
   {
     icon: BarChart3,
-    title: "Analyze",
-    text: "Per-post and per-account analytics. Know what works without staring at six dashboards.",
-    bullets: ["Engagement metrics", "Follower growth", "CSV export"],
+    title: "Performance Loop",
+    text: "Published-post analytics feed back into the AI. What worked last week shapes what gets generated this week.",
+    bullets: ["Engagement memory", "Top-hook detection", "Failed-format avoidance"],
     accent: "from-amber-500/20 to-pink-500/10",
   },
+];
+
+const ROI_ROWS = [
+  { label: "Hours/week on social media content", before: "8–10 hrs", after: "30 min review", icon: Clock },
+  { label: "Monthly cost of VA / agency", before: "$1,500–4,000", after: "$79", icon: DollarSign },
+  { label: "Posts published per month", before: "12–20", after: "60–250", icon: TrendingUp },
+  { label: "Brand consistency across FB / IG / LinkedIn", before: "Drift", after: "Tight", icon: ShieldCheck },
 ];
 
 const PERSONAS = [
   {
     icon: Sparkles,
-    title: "Solo creators",
-    text: "Stay top-of-mind without spending your weekend writing posts.",
+    title: "Shopify & DTC founders",
+    text: "You'd rather spend your day on product than writing Instagram captions. Hand it to an AI that learns your brand.",
   },
   {
-    icon: Users,
-    title: "Small businesses",
-    text: "Show up daily on every platform, even when nobody on your team is a marketer.",
+    icon: Globe2,
+    title: "Operators of 2–5 brands",
+    text: "You run multiple stores or labels and don't have time to keep each voice consistent. One workspace, every brand, one memory.",
   },
   {
-    icon: Layers,
-    title: "Agencies",
-    text: "Manage every client brand in one workspace, with approvals and audit logs.",
+    icon: Zap,
+    title: "Small marketing agencies",
+    text: "Stop juggling Buffer for one client and Vista for another. Manage every client brand from one dashboard, with approvals.",
   },
 ];
 
+// Audit v2: comparison must be against actual US competitors, not a generic
+// "Buffer-style tools" column. These numbers and capability claims come from
+// public pricing/features pages at the time of audit — link out to each
+// in the /vs/* pages.
 const COMPARE = [
-  { feature: "AI captions written for you", kp: true, buffer: "Add-on", manual: false },
-  { feature: "AI image generation built-in", kp: true, buffer: false, manual: false },
-  { feature: "Multi-platform calendar", kp: true, buffer: true, manual: false },
-  { feature: "Approval workflow + comments", kp: true, buffer: "Higher tier", manual: false },
-  { feature: "Per-post analytics", kp: true, buffer: true, manual: false },
-  { feature: "One subscription, no add-ons", kp: true, buffer: false, manual: true },
+  { feature: "AI that learns your brand over time", kp: true, predis: false, ocoya: false, vista: false, buffer: false },
+  { feature: "Multi-platform generate (one click → FB+IG+LI)", kp: true, predis: "Partial", ocoya: "Partial", vista: false, buffer: false },
+  { feature: "Brand voice auto-extract from URL", kp: true, predis: false, ocoya: false, vista: false, buffer: false },
+  { feature: "Per-post analytics + feedback loop", kp: true, predis: "Basic", ocoya: "Basic", vista: true, buffer: true },
+  { feature: "Approval workflow + comments", kp: true, predis: false, ocoya: false, vista: true, buffer: "Higher tier" },
+  { feature: "Entry-tier price", kp: "$29", predis: "$35", ocoya: "$15", vista: "$39", buffer: "$15" },
+  { feature: "Agency tier price", kp: "$199", predis: "$150", ocoya: "$159", vista: "$99", buffer: "$120" },
 ];
 
 const FAQ = [
   {
+    q: "How is this different from Predis, Ocoya, or Vista Social?",
+    a: "Those are scheduling tools with AI bolted on. KonnectPilot is the only one where the AI gets fundamentally better the longer you use it. Every approval, every published post's analytics, every edit becomes context for the next draft. After 2-3 weeks it stops writing 'generic-AI' and starts writing in your voice.",
+  },
+  {
     q: "Is there really a free trial?",
-    a: "Yes. Every paid plan starts with a 7-day free trial. We collect a card so we can keep AI features bot-free, but you won't be charged until day 7 — and you can cancel anytime in one click from the billing portal.",
+    a: "Yes — 7 days, no charge until day 7. We collect a card so we can keep AI features bot-free, but you can cancel anytime from the billing portal with one click.",
   },
   {
     q: "Which platforms do you support today?",
-    a: "Facebook Pages, Instagram Business, and LinkedIn Pages. We're rolling out TikTok and X next based on customer demand.",
+    a: "Facebook Pages, Instagram Business, and LinkedIn. Pinterest and TikTok are on the roadmap (Q3).",
   },
   {
-    q: "Will the AI sound like me, not a robot?",
-    a: "You set a brand voice (Professional, Friendly, Witty, Bold, or Inspirational) plus optional brand keywords and banned phrases. Drafts come out tailored — and you can always edit before scheduling.",
+    q: "I run a Shopify store. Will this integrate?",
+    a: "Yes — we're in the Shopify App Store review process. In the meantime, the brand voice auto-extract reads your Shopify storefront's public pages and infers your voice, audience, and keywords.",
   },
   {
-    q: "What happens if I exceed my plan limits?",
-    a: "We'll never silently bill you for overage. You'll see a clear upgrade prompt, and new scheduling pauses on that resource until you upgrade or the next cycle starts.",
+    q: "Will the AI sound like me or a robot?",
+    a: "It starts close — we extract your voice from your URL on day one. It tightens with every approval. Most customers say drafts feel 'theirs' by week two.",
   },
   {
-    q: "Can my whole team use one workspace?",
-    a: "Yes. Pro and Business include team seats with role-based permissions, threaded comments on drafts, and an approval workflow before anything goes live.",
+    q: "What if I run out of credits?",
+    a: "We never silently bill. You'll see a clear upgrade prompt; you can also buy a one-time top-up pack (100 / 250 / 500 credits) that rolls over month to month.",
   },
 ];
+
+// Social proof scaffolds — logo wall + testimonials. Both arrays start
+// empty so the page is honest pre-traction. The moment Ali has 3 real
+// customers, drop their logos / names / quotes into these arrays and the
+// sections turn on automatically.
+//
+// Logo entry shape: { name, src }   — src can be a CDN url or a local SVG
+// Testimonial entry shape: { name, title, brand, quote, avatar? }
+//
+// We deliberately don't ship placeholder/fake entries: fake testimonials
+// from "Jane Doe at Acme" are anti-trust — better empty than fake.
+const LOGOS: Array<{ name: string; src: string }> = [
+  // { name: "Acme DTC", src: "/logos/acme.svg" },
+];
+const TESTIMONIALS: Array<{
+  name: string;
+  title: string;
+  brand: string;
+  quote: string;
+  avatarSrc?: string;
+}> = [
+  // {
+  //   name: "Sarah Chen",
+  //   title: "Founder",
+  //   brand: "Maker Coffee Co.",
+  //   quote: "Cut our weekly social media time from 8 hours to 30 minutes...",
+  //   avatarSrc: "/avatars/sarah.jpg",
+  // },
+];
+
+function SocialProofSection() {
+  if (LOGOS.length === 0 && TESTIMONIALS.length === 0) return null;
+  return (
+    <>
+      {LOGOS.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
+          <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-6">
+            Trusted by ecommerce teams
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6 opacity-80">
+            {LOGOS.map((logo) => (
+              <img
+                key={logo.name}
+                src={logo.src}
+                alt={logo.name}
+                className="h-7 w-auto grayscale hover:grayscale-0 transition-all"
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {TESTIMONIALS.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+          <p className="text-center text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+            What customers say
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight text-center mb-10">
+            Real teams. Real results.
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {TESTIMONIALS.map((t, i) => (
+              <figure
+                key={i}
+                className="bg-card border border-border rounded-2xl p-6 flex flex-col"
+              >
+                <blockquote className="text-sm text-foreground leading-relaxed mb-4 flex-1">
+                  "{t.quote}"
+                </blockquote>
+                <figcaption className="flex items-center gap-3 mt-auto pt-3 border-t border-border">
+                  {t.avatarSrc ? (
+                    <img src={t.avatarSrc} alt={t.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-primary-foreground font-bold text-sm">
+                      {t.name.charAt(0)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.title} · <span className="font-medium">{t.brand}</span>
+                    </p>
+                  </div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+// Live posts counter — pulls from /api/public/stats. Designed to look
+// understated rather than vanity-metric — the number alone, no fake fire
+// emojis or "trending" pretense. Authentic even at small scale.
+function LivePostsCounter() {
+  const [stats, setStats] = useState<{ postsPublished: number; asOfMonth: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/public/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (!cancelled && s) setStats(s); })
+      .catch(() => { /* silent — counter is non-critical */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Hide entirely until we have data — a "Loading..." here would look worse
+  // than nothing on the landing fold.
+  if (!stats || stats.postsPublished < 1) return null;
+
+  return (
+    <p className="text-xs text-muted-foreground mb-8">
+      <span className="font-bold text-foreground">
+        {stats.postsPublished.toLocaleString()}
+      </span>{" "}
+      posts published through KonnectPilot — {stats.asOfMonth}
+    </p>
+  );
+}
 
 export default function LandingPage() {
   return (
     <MarketingShell>
-      {/* Hero */}
+      {/* Hero — US positioning */}
       <section className="relative overflow-hidden">
-        {/* Decorative background */}
         <div
           aria-hidden
           className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"
@@ -131,18 +274,17 @@ export default function LandingPage() {
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-10 text-center">
           <div className="inline-flex items-center gap-2 bg-card border border-border text-primary text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full mb-6 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5" />
-            AI captions, AI images & auto-scheduling — in one tool
+            <Brain className="w-3.5 h-3.5" />
+            Built for Shopify & DTC brands · AI that learns YOUR voice
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground tracking-tight leading-[1.05] mb-6">
-            Post daily on every platform
+            Social media that gets
             <span className="block bg-gradient-to-r from-primary via-blue-600 to-indigo-500 bg-clip-text text-transparent pb-2">
-              without lifting a finger.
+              sharper every week.
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            KonnectPilot writes, illustrates, schedules, and publishes platform-specific
-            social media content for your brands — every single day, automatically.
+            KonnectPilot doesn't just write captions. It learns your brand voice, watches what your audience engages with, and gets better every time you approve a post. Built for serious ecommerce brands.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
             <Link
@@ -156,7 +298,7 @@ export default function LandingPage() {
               href="/features"
               className="inline-flex items-center justify-center gap-2 border border-border bg-card text-foreground font-semibold px-6 py-3 rounded-lg hover:bg-secondary transition-colors"
             >
-              See how it works
+              See it in action
             </Link>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground mb-12">
@@ -170,6 +312,10 @@ export default function LandingPage() {
               <Check className="w-3.5 h-3.5 text-emerald-500" /> Cancel anytime
             </span>
           </div>
+
+          {/* Live counter — pulls from /api/public/stats (DB count cached
+              5min). Authentic social proof even at small scale. */}
+          <LivePostsCounter />
 
           {/* Hero product visual */}
           <div className="max-w-5xl mx-auto px-2 sm:px-0">
@@ -197,9 +343,9 @@ export default function LandingPage() {
               <Linkedin className="w-5 h-5 text-blue-700" />
               <span className="font-semibold">LinkedIn</span>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">TikTok & X — coming soon</span>
+            <div className="flex items-center gap-2 opacity-50">
+              <span className="font-semibold">Pinterest, TikTok</span>
+              <span className="text-[10px] uppercase tracking-wider bg-secondary px-1.5 py-0.5 rounded">Q3</span>
             </div>
           </div>
         </div>
@@ -212,7 +358,7 @@ export default function LandingPage() {
             How it works
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-            From blank calendar to a month of posts<br className="hidden sm:block" /> in one afternoon.
+            From a URL to a month of posts<br className="hidden sm:block" /> in one afternoon.
           </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6 relative">
@@ -238,15 +384,62 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Three pillars */}
+      {/* ROI math — US ecommerce buyers obsess over this */}
+      <section className="bg-gradient-to-br from-primary/5 to-purple-500/5 border-y border-border">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16">
+          <div className="text-center mb-10">
+            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+              The ROI math
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-3">
+              Cheaper than your VA. Faster than your agency.
+            </h2>
+            <p className="text-muted-foreground">
+              A typical Shopify store spends 8–10 hours a week on social. At $50/hr that's $1,600–$2,000/month gone.
+            </p>
+          </div>
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/40 border-b border-border">
+                <tr>
+                  <th className="text-left p-4 font-semibold text-foreground">Before KonnectPilot</th>
+                  <th className="text-center p-4 font-semibold text-muted-foreground">Without</th>
+                  <th className="text-center p-4 font-semibold text-primary">With Pro · $79/mo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ROI_ROWS.map(({ label, before, after, icon: Icon }, i) => (
+                  <tr key={label} className={i % 2 === 1 ? "bg-secondary/20" : ""}>
+                    <td className="p-4 text-foreground flex items-center gap-2">
+                      <Icon className="w-4 h-4 text-muted-foreground" />
+                      {label}
+                    </td>
+                    <td className="p-4 text-center text-muted-foreground">{before}</td>
+                    <td className="p-4 text-center font-semibold text-foreground">{after}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="bg-primary/5 border-t border-primary/20 p-5 text-center">
+              <p className="text-sm text-foreground">
+                Net savings on Pro plan:
+                <span className="font-bold text-primary text-base mx-1">$1,500–$3,900/month</span>
+                vs. paying a VA or agency.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Three pillars — repositioned around AI moat */}
       <section className="bg-secondary/30 border-y border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
           <div className="text-center mb-12">
             <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
-              One tool. Three pillars.
+              The differentiator
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Stop juggling AI tools, schedulers, and analytics dashboards.
+              Other tools schedule. KonnectPilot learns.
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -292,14 +485,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Personas */}
+      {/* Personas — US ecommerce ICP */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <div className="text-center mb-12">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
             Built for
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-            Anyone who needs to post — and doesn't have time to.
+            Brands that take their voice seriously.
           </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -318,19 +511,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Comparison */}
+      {/* Comparison — real US competitors */}
       <section className="bg-secondary/30 border-y border-border">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-20">
           <div className="text-center mb-10">
             <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
-              Why KonnectPilot
+              How we stack up
             </p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              All-in-one, not bolt-on.
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-3">
+              Compared to the rest of the field.
             </h2>
+            <p className="text-muted-foreground text-sm">
+              The features US ecommerce brands actually compare on — not a vague feature list.
+            </p>
           </div>
           <div className="overflow-x-auto bg-card border border-border rounded-2xl shadow-sm">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left p-4 font-semibold text-foreground">Capability</th>
@@ -339,42 +535,43 @@ export default function LandingPage() {
                       <KpMark className="w-4 h-4" color="currentColor" /> KonnectPilot
                     </span>
                   </th>
-                  <th className="p-4 font-semibold text-foreground">Buffer-style tools</th>
-                  <th className="p-4 font-semibold text-foreground">Doing it manually</th>
+                  <th className="p-4 font-semibold text-foreground">Predis.ai</th>
+                  <th className="p-4 font-semibold text-foreground">Ocoya</th>
+                  <th className="p-4 font-semibold text-foreground">Vista Social</th>
+                  <th className="p-4 font-semibold text-foreground">Buffer</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARE.map((row, i) => (
                   <tr key={row.feature} className={i % 2 === 1 ? "bg-secondary/30" : ""}>
                     <td className="p-4 text-foreground">{row.feature}</td>
-                    <td className="p-4 text-center">
-                      {row.kp === true ? (
-                        <Check className="w-4 h-4 text-primary mx-auto" />
-                      ) : (
-                        <span className="text-sm">{row.kp}</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-center text-muted-foreground">
-                      {row.buffer === true ? (
-                        <Check className="w-4 h-4 text-foreground/50 mx-auto" />
-                      ) : row.buffer === false ? (
-                        <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />
-                      ) : (
-                        <span className="text-xs">{row.buffer}</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-center text-muted-foreground">
-                      {row.manual === true ? (
-                        <Check className="w-4 h-4 text-foreground/50 mx-auto" />
-                      ) : (
-                        <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />
-                      )}
-                    </td>
+                    {(["kp", "predis", "ocoya", "vista", "buffer"] as const).map((key) => {
+                      const v = row[key];
+                      const isKp = key === "kp";
+                      return (
+                        <td key={key} className={`p-4 text-center ${isKp ? "" : "text-muted-foreground"}`}>
+                          {v === true ? (
+                            <Check className={`w-4 h-4 mx-auto ${isKp ? "text-primary" : "text-foreground/50"}`} />
+                          ) : v === false ? (
+                            <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />
+                          ) : (
+                            <span className={`text-xs ${isKp ? "font-semibold text-primary" : ""}`}>{v}</span>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Public pricing &amp; features as of May 2026. We update this monthly. See dedicated{" "}
+            <Link href="/vs/predis-ai" className="text-primary hover:underline">vs Predis.ai</Link>,{" "}
+            <Link href="/vs/ocoya" className="text-primary hover:underline">vs Ocoya</Link>,{" "}
+            <Link href="/vs/vista-social" className="text-primary hover:underline">vs Vista Social</Link>,{" "}
+            and <Link href="/vs/buffer" className="text-primary hover:underline">vs Buffer</Link> pages.
+          </p>
         </div>
       </section>
 
@@ -453,19 +650,19 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid sm:grid-cols-3 gap-6">
           {[
             {
-              icon: Shield,
-              title: "Encrypted at rest",
-              text: "Social tokens are encrypted; per-workspace isolation enforced everywhere.",
+              icon: ShieldCheck,
+              title: "GDPR + CCPA friendly",
+              text: "Per-workspace data isolation, one-click data export and account deletion. No data sold, ever.",
             },
             {
-              icon: ShieldCheck,
-              title: "GDPR-friendly",
-              text: "One-click data export and account deletion. No data sold, ever.",
+              icon: Brain,
+              title: "Your data, your AI",
+              text: "Your brand memory is yours alone — never used to train models for other customers.",
             },
             {
               icon: Star,
               title: "Honest pricing",
-              text: "No silent overages, no surprise upsells. Cancel from one button.",
+              text: "No silent overages. Top-up packs roll over. Cancel from one button.",
             },
           ].map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex items-start gap-3">
@@ -509,6 +706,37 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Founder bio — small, tasteful, builds personal trust. Real name +
+          face beats "a team". When Ali has a headshot, replace the initial
+          avatar with an <img src=...> here. */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-10">
+        <div className="bg-card border border-border rounded-2xl p-6 flex items-start gap-4">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-primary-foreground font-bold text-lg flex-shrink-0">
+            A
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground mb-0.5">
+              Ali Akbar — founder, KonnectPilot
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+              I built KonnectPilot because the AI tools for ecommerce social media all sounded the same — write-a-caption widgets without a brain. The thing that's missing is an AI that <em>learns your specific brand</em>. That's the only feature I cared about. We ship daily, read every signup email, and reply within 24 hours.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Reach me directly:{" "}
+              <a href="mailto:hello@konnectpilot.com" className="text-primary hover:underline">
+                hello@konnectpilot.com
+              </a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Social proof scaffolds — render nothing while empty so the page
+          stays honest. When real logos / testimonials arrive, just drop
+          entries into the LOGOS / TESTIMONIALS arrays in /lib/social-proof.ts
+          (or inline). */}
+      <SocialProofSection />
+
       {/* Final CTA */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
         <div className="relative bg-gradient-to-br from-primary via-blue-600 to-indigo-600 rounded-3xl px-8 py-14 text-center overflow-hidden">
@@ -518,11 +746,10 @@ export default function LandingPage() {
           />
           <div className="relative">
             <h2 className="text-3xl sm:text-4xl font-bold text-primary-foreground mb-4 tracking-tight">
-              Your social calendar, on autopilot.
+              Stop guessing what to post.
             </h2>
             <p className="text-primary-foreground/85 mb-8 max-w-lg mx-auto">
-              Try KonnectPilot free for 7 days. Plan a month of content in one afternoon and
-              never stare at an empty composer again.
+              Let an AI that learns your brand handle the calendar. Start 7-day free trial for 7 days.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link

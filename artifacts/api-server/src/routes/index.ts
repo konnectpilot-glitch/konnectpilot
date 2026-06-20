@@ -15,6 +15,12 @@ import workspacesRouter from "./workspaces";
 import postCommentsRouter from "./post-comments";
 import approvalRouter from "./approval";
 import analyticsRouter from "./analytics";
+import replyDrafterRouter from "./reply-drafter";
+import topicSuggesterRouter from "./topic-suggester";
+import predictRouter from "./predict";
+import insightsRouter from "./insights";
+import commentsInboxRouter from "./comments-inbox";
+import publicStatsRouter from "./public-stats";
 
 const router: IRouter = Router();
 
@@ -34,5 +40,11 @@ router.use(usageRouter);
 router.use(adminRouter);
 router.use(affiliateRouter);
 router.use(analyticsRouter);
+router.use(replyDrafterRouter);
+router.use(topicSuggesterRouter);
+router.use(predictRouter);
+router.use(insightsRouter);
+router.use(commentsInboxRouter);
+router.use(publicStatsRouter);
 
 export default router;

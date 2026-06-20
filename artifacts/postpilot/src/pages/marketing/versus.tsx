@@ -1,0 +1,367 @@
+import { Link } from "wouter";
+import { Check, X, ArrowRight, Brain, Sparkles, ExternalLink } from "lucide-react";
+import MarketingShell from "@/components/marketing-shell";
+import { KpMark } from "@/components/kp-logo";
+
+// Shared template for /vs/<competitor> SEO landing pages. Each competitor
+// page passes a config describing how we compare. Long-tail target: "predis
+// alternative", "ocoya vs konnectpilot", etc. — these searches have buyer
+// intent and cheap CPC ($5-15) but excellent conversion when the comparison
+// is honest and specific.
+
+export interface VersusRow {
+  capability: string;
+  kp: true | false | string;
+  them: true | false | string;
+}
+
+export interface VersusConfig {
+  slug: string;
+  name: string; // e.g. "Predis.ai"
+  shortName: string; // e.g. "Predis"
+  tagline: string; // e.g. "AI-first social media generator"
+  pricing: string; // e.g. "$35–$150/mo"
+  homepage: string;
+  // The opening pitch — 2-3 sentences positioning KonnectPilot against this
+  // specific competitor. Be honest about their strengths.
+  pitch: string;
+  // Top 3 reasons KonnectPilot wins for THIS comparison. Keep specific.
+  winReasons: { title: string; text: string }[];
+  // Capability rows for the comparison table.
+  rows: VersusRow[];
+  // 1-paragraph "when to pick them" — fairness builds trust.
+  whenToPickThem: string;
+}
+
+function Cell({ value, isKp }: { value: true | false | string; isKp: boolean }) {
+  if (value === true) {
+    return <Check className={`w-4 h-4 mx-auto ${isKp ? "text-primary" : "text-foreground/50"}`} />;
+  }
+  if (value === false) {
+    return <X className="w-4 h-4 text-muted-foreground/40 mx-auto" />;
+  }
+  return (
+    <span className={`text-xs ${isKp ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+      {value}
+    </span>
+  );
+}
+
+export default function VersusPage({ config }: { config: VersusConfig }) {
+  return (
+    <MarketingShell>
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"
+        />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-12 text-center">
+          <div className="inline-flex items-center gap-2 bg-card border border-border text-primary text-xs font-medium px-3 py-1.5 rounded-full mb-6 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            Comparison · updated monthly
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight leading-tight mb-5">
+            KonnectPilot <span className="text-muted-foreground font-normal">vs</span>{" "}
+            <span className="bg-gradient-to-r from-primary to-indigo-500 bg-clip-text text-transparent">
+              {config.name}
+            </span>
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
+            {config.pitch}
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mb-8">
+            <span>{config.shortName} pricing: {config.pricing}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <a
+              href={config.homepage}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              {config.shortName} homepage
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
+            >
+              Start 7-day free trial
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center justify-center gap-2 border border-border bg-card text-foreground font-semibold px-6 py-3 rounded-lg hover:bg-secondary transition-colors"
+            >
+              See pricing
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Win reasons */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-16">
+        <div className="text-center mb-10">
+          <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+            Why teams switch
+          </p>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">
+            3 reasons we win this comparison
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {config.winReasons.map((r, i) => (
+            <div key={r.title} className="bg-card border border-border rounded-2xl p-6 relative">
+              <div className="absolute -top-3 left-6 w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-xs">
+                {i + 1}
+              </div>
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+                <Brain className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="font-bold text-foreground mb-2">{r.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{r.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Comparison table */}
+      <section className="bg-secondary/30 border-y border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16">
+          <div className="text-center mb-8">
+            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+              Capability comparison
+            </p>
+            <h2 className="text-3xl font-bold text-foreground tracking-tight">
+              Side by side
+            </h2>
+          </div>
+          <div className="overflow-x-auto bg-card border border-border rounded-2xl shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left p-4 font-semibold text-foreground">Capability</th>
+                  <th className="p-4 font-semibold">
+                    <span className="inline-flex items-center gap-1.5 text-primary">
+                      <KpMark className="w-4 h-4" color="currentColor" /> KonnectPilot
+                    </span>
+                  </th>
+                  <th className="p-4 font-semibold text-foreground">{config.shortName}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {config.rows.map((row, i) => (
+                  <tr key={row.capability} className={i % 2 === 1 ? "bg-secondary/30" : ""}>
+                    <td className="p-4 text-foreground">{row.capability}</td>
+                    <td className="p-4 text-center"><Cell value={row.kp} isKp={true} /></td>
+                    <td className="p-4 text-center"><Cell value={row.them} isKp={false} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Fairness — when to pick them */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+            Honest take
+          </p>
+          <h2 className="text-xl font-bold text-foreground mb-3">
+            When {config.shortName} is the better choice
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {config.whenToPickThem}
+          </p>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="relative bg-gradient-to-br from-primary via-blue-600 to-indigo-600 rounded-3xl px-8 py-14 text-center overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent_50%),radial-gradient(circle_at_70%_80%,white,transparent_50%)]"
+          />
+          <div className="relative">
+            <h2 className="text-3xl font-bold text-primary-foreground mb-4 tracking-tight">
+              Try the difference. 7 days free.
+            </h2>
+            <p className="text-primary-foreground/85 mb-8 max-w-lg mx-auto">
+              See if our brand-learning AI feels different from {config.shortName} within the first hour.
+            </p>
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90 transition-colors shadow-md"
+            >
+              Start free trial
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <p className="text-primary-foreground/70 text-xs mt-5">
+              No charge until day 7 · Cancel anytime · Card required
+            </p>
+          </div>
+        </div>
+      </section>
+    </MarketingShell>
+  );
+}
+
+// ── Configurations for each competitor page ────────────────────────────────
+
+export const PREDIS_CONFIG: VersusConfig = {
+  slug: "predis-ai",
+  name: "Predis.ai",
+  shortName: "Predis",
+  tagline: "AI-first social media generator",
+  pricing: "$35–$150/mo",
+  homepage: "https://predis.ai",
+  pitch:
+    "Predis is the most-marketed AI social tool — slick UI, viral demos, generic output. KonnectPilot is what Predis would be if the AI actually learned your brand instead of pattern-matching every customer to the same template.",
+  winReasons: [
+    {
+      title: "Real brand memory, not pattern-matching",
+      text: "Predis applies the same templates to every customer. KonnectPilot's AI remembers what you approve, reject, and edit — and gets sharper week over week.",
+    },
+    {
+      title: "Brand voice from your URL",
+      text: "Paste your store URL — we infer voice, audience, industry, and keywords in 10 seconds. Predis makes you fill in fields manually.",
+    },
+    {
+      title: "Performance feedback loop",
+      text: "Published post analytics flow back into the AI's context. What worked last week shapes what gets generated this week.",
+    },
+  ],
+  rows: [
+    { capability: "AI captions for FB / IG / LinkedIn", kp: true, them: true },
+    { capability: "AI image generation per post", kp: true, them: true },
+    { capability: "Brand voice extracted from URL", kp: true, them: false },
+    { capability: "AI learns from approvals & edits", kp: true, them: false },
+    { capability: "Performance-data feedback loop", kp: true, them: false },
+    { capability: "Multi-platform generate in one click", kp: true, them: "Partial" },
+    { capability: "Approval workflow + comments", kp: true, them: false },
+    { capability: "Multi-brand workspace", kp: "Up to 25", them: "Per workspace" },
+    { capability: "Entry price", kp: "$29", them: "$35" },
+    { capability: "Agency tier", kp: "$199", them: "$150" },
+  ],
+  whenToPickThem:
+    "Predis is the safer brand-name choice if you want a generic AI social tool with a polished UI and you don't care about brand-voice consistency or improvement over time. They've also been around longer, so if vendor longevity matters to you they have a small edge. For everyone else — especially anyone running 2+ brands or serious about voice — KonnectPilot's learning loop is the more valuable investment.",
+};
+
+export const OCOYA_CONFIG: VersusConfig = {
+  slug: "ocoya",
+  name: "Ocoya",
+  shortName: "Ocoya",
+  tagline: "AI social + in-app Canva-style editor",
+  pricing: "$15–$159/mo",
+  homepage: "https://ocoya.com",
+  pitch:
+    "Ocoya is cheap and has a nice in-app image editor. Its scheduling and AI are basic by 2026 standards, and its Meta + LinkedIn integration is known to be flaky. KonnectPilot trades the in-app editor for a brand-learning AI and rock-solid OAuth.",
+  winReasons: [
+    {
+      title: "AI that learns, not generic GPT calls",
+      text: "Ocoya's AI is a thin wrapper over GPT — same output as every other tool. KonnectPilot's brand memory + performance loop give increasingly differentiated drafts.",
+    },
+    {
+      title: "Unified Meta OAuth that doesn't break",
+      text: "Ocoya users report frequent Meta disconnection issues. KonnectPilot uses Meta's modern combined Facebook + Instagram OAuth — one flow, both platforms.",
+    },
+    {
+      title: "Multi-brand workspaces, real approval queue",
+      text: "Ocoya's per-brand separation is weak. KonnectPilot is built around multi-brand from day one — with bulk approvals, per-brand analytics, and team comments.",
+    },
+  ],
+  rows: [
+    { capability: "AI captions + image generation", kp: true, them: true },
+    { capability: "In-app Canva-style editor", kp: false, them: true },
+    { capability: "AI learns your brand over time", kp: true, them: false },
+    { capability: "Brand voice extracted from URL", kp: true, them: false },
+    { capability: "Modern Meta OAuth (FB + IG combined)", kp: true, them: "Outdated" },
+    { capability: "Approval workflow + comments", kp: true, them: false },
+    { capability: "Multi-brand workspaces", kp: "Up to 25", them: "Limited" },
+    { capability: "Entry price", kp: "$29", them: "$15" },
+    { capability: "Agency tier", kp: "$199", them: "$159" },
+  ],
+  whenToPickThem:
+    "Ocoya is genuinely cheaper at the entry tier and the in-app editor is nice if your bottleneck is design, not copy. If you're a solo creator who mostly needs to schedule pretty images and doesn't care about voice consistency, Ocoya is a reasonable pick. For ecommerce brands that care about how their writing sounds — and don't have time to fight OAuth bugs every other week — KonnectPilot is the safer bet.",
+};
+
+export const VISTA_CONFIG: VersusConfig = {
+  slug: "vista-social",
+  name: "Vista Social",
+  shortName: "Vista",
+  tagline: "Polished scheduler with bolt-on AI",
+  pricing: "$39–$99/mo",
+  homepage: "https://vistasocial.com",
+  pitch:
+    "Vista is the best-looking scheduler in this comparison — the calendar UX is excellent and the team features are solid. The AI is a generic bolt-on. KonnectPilot is for teams that care more about what gets posted than how it gets queued.",
+  winReasons: [
+    {
+      title: "AI-first, not scheduler-first",
+      text: "Vista is a scheduler with AI bolted on. KonnectPilot is built around the AI — every feature flows from the brand-learning engine.",
+    },
+    {
+      title: "Brand voice that improves over time",
+      text: "Vista's AI is the same as every other generic tool — call GPT, get GPT output. KonnectPilot's AI gets specifically better at YOUR brand week over week.",
+    },
+    {
+      title: "Brand voice from URL — onboarding in seconds",
+      text: "Vista's setup is form-heavy. KonnectPilot reads your store URL and infers your brand profile automatically.",
+    },
+  ],
+  rows: [
+    { capability: "AI captions + image generation", kp: true, them: "Basic" },
+    { capability: "Visual content calendar", kp: true, them: true },
+    { capability: "AI learns your brand over time", kp: true, them: false },
+    { capability: "Brand voice extracted from URL", kp: true, them: false },
+    { capability: "Performance-data feedback loop", kp: true, them: false },
+    { capability: "Approval workflow + comments", kp: true, them: true },
+    { capability: "White-label client reports", kp: "Agency tier", them: true },
+    { capability: "Entry price", kp: "$29", them: "$39" },
+    { capability: "Agency tier", kp: "$199", them: "$99" },
+  ],
+  whenToPickThem:
+    "Vista is a great pick if scheduling is your primary need and AI is a nice-to-have. Their calendar UX is the best in the category and their white-label features are well-developed. If you're picking a tool primarily to organize a content calendar and your team writes captions themselves, Vista is hard to beat. KonnectPilot wins for teams that want the AI to do the heavy lifting on what gets written.",
+};
+
+export const BUFFER_CONFIG: VersusConfig = {
+  slug: "buffer",
+  name: "Buffer",
+  shortName: "Buffer",
+  tagline: "The legacy scheduler with token AI",
+  pricing: "$15–$120/mo",
+  homepage: "https://buffer.com",
+  pitch:
+    "Buffer is the household-name scheduler — trusted, mature, slow to innovate on AI. KonnectPilot is what Buffer would look like if it were rebuilt today, around the AI instead of around the queue.",
+  winReasons: [
+    {
+      title: "Built for the AI era",
+      text: "Buffer was designed pre-LLM. KonnectPilot is AI-native — brand memory, performance memory, and platform-specific generation are core, not add-ons.",
+    },
+    {
+      title: "Brand voice that learns",
+      text: "Buffer's AI assistant is generic. KonnectPilot's AI learns your brand from approvals, edits, and post performance — it gets sharper every week.",
+    },
+    {
+      title: "Multi-platform generate in one click",
+      text: "Buffer makes you generate per platform. KonnectPilot writes Facebook, Instagram, and LinkedIn drafts simultaneously — each tuned for that platform's audience.",
+    },
+  ],
+  rows: [
+    { capability: "AI captions + image generation", kp: true, them: "Add-on" },
+    { capability: "AI learns your brand over time", kp: true, them: false },
+    { capability: "Brand voice extracted from URL", kp: true, them: false },
+    { capability: "Multi-platform generate (FB + IG + LI at once)", kp: true, them: false },
+    { capability: "Performance-data feedback loop", kp: true, them: false },
+    { capability: "Approval workflow + comments", kp: true, them: "Higher tier" },
+    { capability: "Established brand + market trust", kp: "Growing", them: true },
+    { capability: "Entry price", kp: "$29", them: "$15" },
+    { capability: "Agency tier", kp: "$199", them: "$120" },
+  ],
+  whenToPickThem:
+    "Buffer remains a smart choice if you value brand-name trust above features, or if your team is large enough that you need years of battle-tested workflow stability. They've been around for a decade and aren't going anywhere. For teams willing to bet on a modern AI-first tool with a real learning loop, KonnectPilot is the more interesting choice.",
+};

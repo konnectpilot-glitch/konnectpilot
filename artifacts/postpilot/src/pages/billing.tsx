@@ -16,8 +16,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TOP_UPS, ADD_ONS, CREDIT_RULES } from "@/lib/plans";
+import { friendlyError } from "@/lib/friendly-error";
 
 function fmt(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(1);
@@ -36,6 +37,23 @@ export default function BillingPage() {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
   const currentPlan = (user?.publicMetadata?.plan as string) ?? "free";
 
+  // Show success toast when Stripe redirects back with ?success=1 or ?topup=1.
+  // Strip the param so the toast doesn't re-fire on refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "1") {
+      toast.success("Subscription started — your 7-day free trial is now active");
+    } else if (params.get("topup") === "1") {
+      toast.success("Top-up credited to your account");
+    } else {
+      return;
+    }
+    params.delete("success");
+    params.delete("topup");
+    const qs = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${qs ? "?" + qs : ""}`);
+  }, []);
+
   async function handleSubscribe(planId: string) {
     setLoadingPlan(planId);
     const origin = window.location.origin;
@@ -51,7 +69,7 @@ export default function BillingPage() {
         onSuccess: (data) => {
           if (data.url) window.location.href = data.url;
         },
-        onError: (err: any) => toast.error(err?.data?.error ?? "Failed to start checkout"),
+        onError: (err: any) => toast.error(friendlyError(err, "Couldn't start checkout. Please try again.")),
         onSettled: () => setLoadingPlan(null),
       },
     );
@@ -75,7 +93,7 @@ export default function BillingPage() {
       if (!res.ok) throw new Error(data?.error ?? "Failed");
       if (data.url) window.location.href = data.url;
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to start top-up checkout");
+      toast.error(friendlyError(err, "Couldn't start the top-up checkout. Please try again."));
     } finally {
       setLoadingTopup(null);
     }
@@ -87,7 +105,7 @@ export default function BillingPage() {
       onSuccess: (data) => {
         if (data.url) window.location.href = data.url;
       },
-      onError: (err: any) => toast.error(err?.data?.error ?? "Failed to open billing portal"),
+      onError: (err: any) => toast.error(friendlyError(err, "Couldn't open the billing portal. Please try again.")),
       onSettled: () => setLoadingPortal(false),
     });
   }
@@ -99,7 +117,7 @@ export default function BillingPage() {
 
   return (
     <Layout>
-      <div className="p-6 max-w-5xl mx-auto space-y-8">
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Billing</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
