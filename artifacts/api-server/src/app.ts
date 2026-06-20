@@ -244,7 +244,7 @@ if (process.env.NODE_ENV === "production") {
 
   // SPA fallback — any GET that didn't match an API route or static file
   // gets index.html so client-side routing works.
-  app.get("*", (_req, res, next) => {
+  app.get("/{*splat}", (_req, res, next) => {
     // Don't catch /api or /img routes that fell through
     if (_req.path.startsWith("/api") || _req.path.startsWith("/img")) {
       return next();
