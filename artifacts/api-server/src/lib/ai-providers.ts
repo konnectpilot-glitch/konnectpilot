@@ -7,7 +7,7 @@ import { logger } from "./logger";
  *   - Images         → Google Gemini 2.5 Flash Image ("Nano Banana")
  */
 
-const CLAUDE_MODEL_ID = process.env.ANTHROPIC_MODEL_ID || "claude-opus-4-7";
+const CLAUDE_MODEL_ID = process.env.ANTHROPIC_MODEL_ID || "claude-haiku-4-5-20251001";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
