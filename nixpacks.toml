@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["corepack enable && pnpm install --no-frozen-lockfile"]
+
+[phases.build]
+cmds = ["cd artifacts/postpilot && PORT=25960 BASE_PATH=/ pnpm run build && cd ../api-server && pnpm run build"]
+
+[start]
+cmd = "node artifacts/api-server/dist/index.mjs"
