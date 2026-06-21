@@ -181,8 +181,8 @@ function getRedirectUri(req: any, platform: string): string {
   // settings. We honor a dedicated env var (FACEBOOK_REDIRECT_URI) for that
   // platform so the registered URI can differ from APP_URL (which is the
   // frontend's URL). Other providers derive from APP_URL as before.
-  if (platform === "meta" && process.env.FACEBOOK_REDIRECT_URI) {
-    return process.env.FACEBOOK_REDIRECT_URI;
+  if (platform === "meta") {
+    return process.env.FACEBOOK_REDIRECT_URI ?? "https://www.konnectpilot.com/api/social-accounts/callback/facebook";
   }
   return `${getAppUrl(req)}/api/social-accounts/callback/${platform}`;
 }
